@@ -83,6 +83,7 @@ export function receivedLabel(iso: string): string {
 export function inquiryStatusLabel(status: InquiryStatus): string {
   if (status === "responded") return "Responded";
   if (status === "closed") return "Closed";
+  if (status === "declined") return "Declined";
   return "New";
 }
 

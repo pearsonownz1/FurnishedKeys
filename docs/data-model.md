@@ -23,9 +23,9 @@ Public read of active rows. Admins read and write every row, including inactive 
 
 ### `profiles`
 
-`id`, `full_name`, `email`, `phone`, `notify_email`, `role`, `company_name`, `created_at`.
+`id`, `full_name`, `email`, `phone`, `notify_new_inquiry`, `notify_new_message`, `notify_listing_status`, `role`, `company_name`, `created_at`.
 
-`notify_email` defaults to true. When it is false, inquiry notices and renter-message notices to that owner are skipped. Review decision mail still sends. `phone` was already on the profile.
+`notify_new_inquiry`, `notify_new_message`, and `notify_listing_status` each default to true. They replace the earlier single `notify_email` column. A false `notify_email` was copied onto all three before that column was dropped. Inquiry notices respect `notify_new_inquiry`. Renter-message notices respect `notify_new_message`. Listing approved, changes-requested, and rejected mail respects `notify_listing_status`. `phone` was already on the profile.
 
 `role` is `renter | owner | manager | admin`, default `renter`. A trigger on `auth.users` inserts the profile at signup and always sets `renter`. Display name may be copied from signup metadata. Role is never taken from `user_metadata`.
 
@@ -98,7 +98,7 @@ Rent stays on `listings.monthly_rent_cents`. Utilities, deposits, cleaning, pet,
 
 `id`, `listing_id`, `renter_id`, `name`, `email`, `phone`, `move_in`, `move_out`, `occupants`, `pets`, `message`, `status`, `assigned_to`, `renter_token_hash`, `last_message_at`, `owner_unread`, `renter_unread`, `created_at`.
 
-`renter_id` is null for a signed-out visitor. `status` is `new | responded | closed`, default `new`. `assigned_to` may point at a `manager` or `admin` profile.
+`renter_id` is null for a signed-out visitor. `status` is `new | responded | closed | declined`, default `new`. `assigned_to` may point at a `manager` or `admin` profile. `declined` is set by the listing owner through `declineInquiry`. The inbox still returns those rows and marks them with that status. Anonymous inserts still require `status = new`.
 
 Anonymous and signed-in visitors can insert a row with `status = new`, `assigned_to` null, and `renter_id` null or their own id, and only when `private.listing_is_public(listing_id)` is true and the listing is not a demo (`private.listing_is_demo`). They cannot read it back unless they are signed in and `renter_id` is their id. The listing owner, the assignee, and admins can read the thread. Owners and assignees can update `status`, `assigned_to`, `owner_unread`, `renter_unread`, and `last_message_at`. They cannot change `renter_token_hash`. Admins and the service role can edit the rest.
 
@@ -114,9 +114,11 @@ The owner board loads inquiries with `status` in `new` or `responded`. Each boar
 
 ### `messages`
 
-`id`, `inquiry_id`, `sender_id`, `sender_role`, `body`, `created_at`.
+`id`, `inquiry_id`, `sender_id`, `sender_role`, `body`, `emailed`, `created_at`.
 
 `sender_role` is `owner` or `renter`, default `owner`. `sender_id` stays nullable. Owner replies set `sender_id` to the signed-in profile and `sender_role` to `owner`. Renter replies set `sender_id` null and `sender_role` to `renter`, and only the service role inserts those after the token hash matches. `anon` has no privilege on `messages`. Signed-in users can insert only when `sender_role = owner`, `sender_id` is themselves, and `private.can_read_inquiry` is true. They can select messages on inquiries they can read. They cannot update messages. Admins can delete.
+
+`emailed` defaults to false. A non-bypass insert forces it false. It becomes true only when the service role updates it after Resend accepts the email to the other party. A skipped or failed send leaves it false, so the thread can show "emailed" only for a send that was accepted.
 
 A renter can send at most 20 messages on one inquiry per hour.
 
@@ -271,19 +273,21 @@ Front end Embedded Checkout needs `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`. The webh
 
 ## Owner dashboard loaders and actions
 
-Front End builds the Listings, Inquiries, Calendar, and Settings screens. These are the server contracts. Signed-out loaders return `[]` or `null`. Actions return `{ ok, success?, formError?, fieldErrors?, message? }`.
+Front End builds the Listings, Inquiries, Calendar, and Settings screens. These are the server contracts. Signed-out list loaders return `[]`, `loadInbox` returns `{ inquiries: [], unread_total: 0 }`, and the other loaders return `null`. Actions return `{ ok, success?, formError?, fieldErrors?, message? }`.
 
 | Export | File | Args | Returns |
 | --- | --- | --- | --- |
-| `loadInbox` | `lib/owner-dashboard-load.ts` | none | `InboxInquiry[]` sorted by `last_message_at` desc. Each item: `id`, `name`, `email`, `phone`, `move_in`, `move_out`, `occupants`, `pets`, `status`, `listing_title`, `last_message_snippet`, `unread_count` (`owner_unread`), `last_message_at`. |
-| `loadThread` | `lib/owner-dashboard-load.ts` | `inquiryId: string` | `OwnerThread` or `null`. `inquiry` plus `messages: { id, sender_role, body, created_at }[]` oldest first. Sets `owner_unread` to 0 when the signed-in user can read the inquiry. |
-| `loadOwnerListings` | `lib/owner-dashboard-load.ts` | none | `OwnerListingCard[]`: `id`, `title`, `status`, `cover_url` (signed, or null), `city` (location name), `setup_step`, `percent_complete` (0–100 from the 8 submit fields), `resume_href` (`/owners/listings/<id>/setup?step=<setup_step>`), `updated_at`. |
+| `loadInbox` | `lib/owner-dashboard-load.ts` | none | `{ inquiries, unread_total }`. `inquiries` is every status, including `declined`, sorted by `last_message_at` desc. Each item: `id`, `name`, `email`, `phone`, `move_in`, `move_out`, `occupants`, `pets`, `status`, `listing_title`, `last_message_snippet`, `unread_count` (`owner_unread`), `last_message_at`. `unread_total` is the sum of `owner_unread`, including declined threads. Signed out: `{ inquiries: [], unread_total: 0 }`. |
+| `loadThread` | `lib/owner-dashboard-load.ts` | `inquiryId: string` | `OwnerThread` or `null`. `inquiry` plus `messages: { id, sender_role, body, emailed, created_at }[]` oldest first. `emailed` is true only after Resend accepted the send. Sets `owner_unread` to 0 when the signed-in user can read the inquiry. The renter page uses the same message shape. |
+| `loadOwnerListings` | `lib/owner-dashboard-load.ts` | none | `OwnerListingCard[]`: `id`, `title`, `status`, `status_group` (`draft`, `review`, or `live`), `cover_url` (signed, or null), `city` (location name), `setup_step`, `step_index` (1-based resume step), `step_count` (10), `next_step_label` (that step's label, for example "Photos"), `percent_complete` (0–100 from the 8 submit fields), `resume_href` (`/owners/listings/<id>/setup?step=<setup_step>`), `updated_at`. Card copy is `Step ${step_index} of ${step_count} · ${next_step_label} next`. `draft` covers draft, rejected, changes_requested, and archived. `review` is `pending_review`. `live` is `approved`. |
 | `loadCalendar` | `lib/owner-dashboard-load.ts` | `listingId`, `month` `YYYY-MM` | `{ listing_id, month, blocked_days, availability: { id, available_from, available_to }[] }` or `null`. `blocked_days` are the expanded days in that month. Availability windows are the whole listing. |
-| `loadSettings` | `lib/owner-dashboard-load.ts` | none | `{ full_name, email, phone, notify_email }` or `null`. `email` is the auth user email when present. |
-| `replyToInquiry` | `app/(site)/owner/actions.ts` | `(prev, formData{inquiryId, body})` | Same `{ ok, success?, formError? }` as before. Rotates the renter token and emails `/inquiry/<token>`. |
-| `renterReply` | `app/(site)/inquiry/actions.ts` | `(prev, formData{token, body})` | `{ ok, success?, formError? }`. Body 1–8000. Bad token: "This link has expired. Open the newest email from the owner." Over 20 renter messages an hour: "Please wait before sending another message." Inserts `sender_role: "renter"`, increments `owner_unread`, sets `last_message_at`, and emails the owner "New message about <title>" with a button to `/owner/inquiries/<id>` when `notify_email` is not false. |
+| `loadSettings` | `lib/owner-dashboard-load.ts` | none | `{ full_name, email, phone, notify_new_inquiry, notify_new_message, notify_listing_status }` or `null`. `email` is the auth user email when present. Each notify flag is true unless the column is false. |
+| `replyToInquiry` | `app/(site)/owner/actions.ts` | `(prev, formData{inquiryId, body})` | Same `{ ok, success?, formError? }` as before. Rotates the renter token and emails `/inquiry/<token>`. Sets `messages.emailed` when Resend returns an id. |
+| `declineInquiry` | `app/(site)/owner/actions.ts` | `(prev, formData{inquiryId, note?})` | `{ ok, success?, formError? }`. Owner only. Sets status to `declined` and emails the renter "The owner is not able to offer this stay." Optional `note` is at most 2000 characters and is included, escaped. The row stays in `loadInbox`. Another owner: "That inquiry is not on your board." A mail failure still returns success. |
+| `renterReply` | `app/(site)/inquiry/actions.ts` | `(prev, formData{token, body})` | `{ ok, success?, formError? }`. Body 1–8000. Bad token: "This link has expired. Open the newest email from the owner." Over 20 renter messages an hour: "Please wait before sending another message." Inserts `sender_role: "renter"`, increments `owner_unread`, sets `last_message_at`, and emails the owner "New message about <title>" with a button to `/owner/inquiries/<id>` when `notify_new_message` is not false. Sets `messages.emailed` when Resend returns an id. |
 | `setBlockedDates` | `app/(site)/owner/calendar-actions.ts` | `(listingId, days: string[], blocked: boolean)` | `{ ok, formError? }`. Adds or removes those `YYYY-MM-DD` days on `listing_blocked_dates` and keeps the other days. Another owner gets "That listing is not yours." |
-| `saveProfile` | `app/(site)/owner/settings-actions.ts` | `(prev, formData{full_name, phone, notify_email})` | `{ ok, success?, formError?, fieldErrors? }`. `notify_email` is true only for `true`, `on`, or `1`. |
+| `confirmAvailability` | `app/(site)/owner/calendar-actions.ts` | `(listingId)` | `{ ok, formError? }`. Owner only. Sets every `availability_windows.last_confirmed_at` for that listing to now and `confirmed_by` to the owner. That is the browse-card "Availability confirmed" stamp. Also sets `listings.calendar_updated_at` to now, which the property page shows as "Calendar updated". Then revalidates `/rentals/<slug>`, `/rentals`, and `/`. Another owner: "That listing is not yours." |
+| `saveProfile` | `app/(site)/owner/settings-actions.ts` | `(prev, formData{full_name, phone, notify_new_inquiry, notify_new_message, notify_listing_status})` | `{ ok, success?, formError?, fieldErrors? }`. Each notify field is true only for `true`, `on`, or `1`. An omitted box is false. |
 | `changeEmail` | `app/(site)/owner/settings-actions.ts` | `(prev, formData{email})` | `{ ok, success?, formError?, fieldErrors?, message? }`. Calls `supabase.auth.updateUser`. Success message: "Check your inbox to confirm the new email." A trigger copies the confirmed auth email onto `profiles.email`. |
 | `changePassword` | `app/(site)/owner/settings-actions.ts` | `(prev, formData{current_password, new_password})` | `{ ok, success?, formError?, fieldErrors? }`. `new_password` is 8–72 characters. `signInWithPassword` runs first, then `updateUser`. |
 

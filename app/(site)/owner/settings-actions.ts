@@ -7,7 +7,7 @@ export type SettingsState = {
   success?: boolean;
   formError?: string;
   fieldErrors?: Partial<
-    Record<"full_name" | "phone" | "email" | "current_password" | "new_password" | "notify_email", string>
+    Record<"full_name" | "phone" | "email" | "current_password" | "new_password", string>
   >;
   /** Set when an email change is waiting on the confirmation message. */
   message?: string;
@@ -19,7 +19,7 @@ function checked(value: FormDataEntryValue | null): boolean {
   return value === "true" || value === "on" || value === "1";
 }
 
-/** Saves full_name, phone, and notify_email. An unchecked notify_email box is false. */
+/** Saves the profile. Each notify box is true only for `true`, `on`, or `1`. An omitted box is false. */
 export async function saveProfile(
   _previous: SettingsState,
   formData: FormData,
@@ -42,7 +42,9 @@ export async function saveProfile(
     .update({
       full_name: fullName || null,
       phone: phoneRaw || null,
-      notify_email: checked(formData.get("notify_email")),
+      notify_new_inquiry: checked(formData.get("notify_new_inquiry")),
+      notify_new_message: checked(formData.get("notify_new_message")),
+      notify_listing_status: checked(formData.get("notify_listing_status")),
     })
     .eq("id", user.id);
   if (saved.error) {

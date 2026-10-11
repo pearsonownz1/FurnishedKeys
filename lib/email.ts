@@ -40,6 +40,12 @@ export type RenterMessageNotice = {
   inquiryId: string;
 };
 
+export type InquiryDecline = {
+  to: string;
+  listingTitle: string;
+  note: string | null;
+};
+
 /** Guy's address. Preview tests override this with LEADS_NOTIFY_TO. */
 export const DEFAULT_LEADS_NOTIFY_TO = "guy@gcs.org";
 
@@ -219,7 +225,7 @@ export async function deliverInquiryNotice(notice: InquiryNotice): Promise<SendR
   try {
     const owner = await ownerContact(notice.ownerId);
     if (!owner.email) return { id: null, detail: owner.detail };
-    if (!owner.notify) return { id: null, detail: "skipped:notify-email" };
+    if (!owner.notifyNewInquiry) return { id: null, detail: "skipped:notify-new-inquiry" };
     const origin = await siteOrigin();
     const inquiryUrl = `${origin}/owner#inquiry-${notice.inquiryId}`;
     return await sendEmail({
@@ -251,12 +257,12 @@ export async function deliverInquiryReply(reply: InquiryReply): Promise<SendResu
   }
 }
 
-/** Emails the owner that the renter wrote back. Skipped when notify_email is false. */
+/** Emails the owner that the renter wrote back. Skipped when notify_new_message is false. */
 export async function deliverRenterMessageNotice(notice: RenterMessageNotice): Promise<SendResult> {
   try {
     const owner = await ownerContact(notice.ownerId);
     if (!owner.email) return { id: null, detail: owner.detail };
-    if (!owner.notify) return { id: null, detail: "skipped:notify-email" };
+    if (!owner.notifyNewMessage) return { id: null, detail: "skipped:notify-new-message" };
     const origin = await siteOrigin();
     const threadUrl = `${origin}/owner/inquiries/${notice.inquiryId}`;
     return await sendEmail({
@@ -290,11 +296,40 @@ export async function deliverOwnerLeadNotice(lead: OwnerLeadNotice): Promise<Sen
   }
 }
 
-/** Looks up the owner and sends the review decision. A failure is logged and swallowed. */
+/** Emails the renter a short decline. The optional note is escaped. A failure is logged and swallowed. */
+export async function deliverInquiryDecline(decline: InquiryDecline): Promise<SendResult> {
+  try {
+    return await sendEmail({
+      to: decline.to,
+      subject: `About your inquiry for ${oneLine(decline.listingTitle)}`,
+      html: inquiryDeclineHtml(decline.listingTitle, decline.note),
+    });
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : "error";
+    console.error("inquiry decline email failed", reason);
+    return { id: null, detail: `failed:${reason}`.slice(0, 180) };
+  }
+}
+
+export function inquiryDeclineHtml(title: string, note: string | null): string {
+  const noteBlock = note?.trim()
+    ? `<p style="margin:0 0 16px;">${escapeHtml(note.trim()).replaceAll("\n", "<br>")}</p>`
+    : "";
+  return layout(
+    `<p style="margin:0 0 16px;">Thank you for asking about <strong>${escapeHtml(title)}</strong>. The owner is not able to offer this stay.</p>` +
+      noteBlock,
+  );
+}
+
+/** Looks up the owner and sends the review decision. Skipped when notify_listing_status is false. */
 export async function deliverReviewDecision(notice: ReviewNotice): Promise<void> {
   try {
     const owner = await ownerContact(notice.ownerId);
     if (!owner.email) return;
+    if (!owner.notifyListingStatus) {
+      console.error("review email skipped: notify_listing_status");
+      return;
+    }
     const title = oneLine(notice.listingTitle);
     const subject =
       notice.decision === "approved"
@@ -318,28 +353,44 @@ export async function deliverReviewDecision(notice: ReviewNotice): Promise<void>
   }
 }
 
-async function ownerContact(
-  ownerId: string,
-): Promise<{ email: string | null; notify: boolean; detail: string }> {
+async function ownerContact(ownerId: string): Promise<{
+  email: string | null;
+  notifyNewInquiry: boolean;
+  notifyNewMessage: boolean;
+  notifyListingStatus: boolean;
+  detail: string;
+}> {
+  const off = {
+    email: null as string | null,
+    notifyNewInquiry: false,
+    notifyNewMessage: false,
+    notifyListingStatus: false,
+  };
   const service = createServiceClient();
   if (!service) {
     console.error("email skipped: service client is not configured");
-    return { email: null, notify: false, detail: "skipped:no-service-client" };
+    return { ...off, detail: "skipped:no-service-client" };
   }
   const { data, error } = await service
     .from("profiles")
-    .select("email, notify_email")
+    .select("email, notify_new_inquiry, notify_new_message, notify_listing_status")
     .eq("id", ownerId)
     .maybeSingle();
   if (error) {
     console.error("email skipped: owner lookup failed", error.message);
-    return { email: null, notify: false, detail: `skipped:lookup:${error.message}`.slice(0, 180) };
+    return { ...off, detail: `skipped:lookup:${error.message}`.slice(0, 180) };
   }
   if (!data?.email) {
     console.error("email skipped: owner has no email");
-    return { email: null, notify: false, detail: "skipped:no-owner-email" };
+    return { ...off, detail: "skipped:no-owner-email" };
   }
-  return { email: data.email, notify: data.notify_email !== false, detail: "ok" };
+  return {
+    email: data.email,
+    notifyNewInquiry: data.notify_new_inquiry !== false,
+    notifyNewMessage: data.notify_new_message !== false,
+    notifyListingStatus: data.notify_listing_status !== false,
+    detail: "ok",
+  };
 }
 
 export async function publicOrigin(): Promise<string> {

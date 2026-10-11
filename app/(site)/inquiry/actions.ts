@@ -62,16 +62,21 @@ export async function renterReply(
   }
   if ((recent.count ?? 0) >= HOUR_LIMIT) return { ok: false, formError: RENTER_LIMIT };
 
-  const inserted = await service.from("messages").insert({
-    inquiry_id: inquiry.data.id,
-    sender_id: null,
-    sender_role: "renter",
-    body,
-  });
-  if (inserted.error) {
-    console.error("renter reply insert failed", inserted.error.message);
+  const inserted = await service
+    .from("messages")
+    .insert({
+      inquiry_id: inquiry.data.id,
+      sender_id: null,
+      sender_role: "renter",
+      body,
+    })
+    .select("id")
+    .single();
+  if (inserted.error || !inserted.data) {
+    console.error("renter reply insert failed", inserted.error?.message ?? "no row");
     return { ok: false, formError: RENTER_SEND };
   }
+  const messageId = inserted.data.id;
 
   const bumped = await service
     .from("inquiries")
@@ -91,11 +96,17 @@ export async function renterReply(
     .maybeSingle();
   if (!listing.error && listing.data?.owner_id) {
     try {
-      await deliverRenterMessageNotice({
+      const mailed = await deliverRenterMessageNotice({
         ownerId: listing.data.owner_id,
         listingTitle: listing.data.title?.trim() || "your home",
         inquiryId: inquiry.data.id,
       });
+      if (mailed.id) {
+        const flagged = await service.from("messages").update({ emailed: true }).eq("id", messageId);
+        if (flagged.error) {
+          console.error("message emailed flag failed", flagged.error.message);
+        }
+      }
     } catch (error) {
       console.error("renter reply email failed", error instanceof Error ? error.message : "error");
     }

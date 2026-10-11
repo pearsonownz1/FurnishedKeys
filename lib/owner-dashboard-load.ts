@@ -6,6 +6,8 @@ import { locationById } from "@/lib/locations";
 import {
   blockedDaysInMonth,
   listingPercent,
+  listingStatusGroup,
+  listingStepProgress,
   messageSnippet,
   resumeHref,
   type OwnerListingCard,
@@ -32,8 +34,18 @@ export type ThreadMessage = {
   id: string;
   sender_role: "owner" | "renter";
   body: string;
+  /** True once Resend accepted the email to the other party. */
+  emailed: boolean;
   created_at: string;
 };
+
+export type OwnerInbox = {
+  inquiries: InboxInquiry[];
+  /** Sum of owner_unread, including declined threads. */
+  unread_total: number;
+};
+
+const emptyInbox: OwnerInbox = { inquiries: [], unread_total: 0 };
 
 export type OwnerThread = {
   inquiry: {
@@ -69,19 +81,21 @@ export type SettingsProfile = {
   full_name: string | null;
   email: string | null;
   phone: string | null;
-  notify_email: boolean;
+  notify_new_inquiry: boolean;
+  notify_new_message: boolean;
+  notify_listing_status: boolean;
 };
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const monthPattern = /^\d{4}-\d{2}$/;
 
-/** Owner inquiries, newest activity first. Empty when signed out. */
-export async function loadInbox(): Promise<InboxInquiry[]> {
+/** Owner inquiries, newest activity first, plus the menu badge count. Empty when signed out. */
+export async function loadInbox(): Promise<OwnerInbox> {
   const { supabase, user } = await sessionUser();
-  if (!user) return [];
+  if (!user) return emptyInbox;
 
   const listings = await supabase.from("listings").select("id, title").eq("owner_id", user.id);
-  if (listings.error || !listings.data?.length) return [];
+  if (listings.error || !listings.data?.length) return emptyInbox;
   const titles = new Map(listings.data.map((row) => [row.id, row.title?.trim() || "Untitled listing"]));
   const ids = [...titles.keys()];
 
@@ -92,7 +106,7 @@ export async function loadInbox(): Promise<InboxInquiry[]> {
     )
     .in("listing_id", ids)
     .order("last_message_at", { ascending: false, nullsFirst: false });
-  if (inquiries.error || !inquiries.data?.length) return [];
+  if (inquiries.error || !inquiries.data?.length) return emptyInbox;
 
   const inquiryIds = inquiries.data.map((row) => row.id);
   const messages = await supabase
@@ -105,7 +119,7 @@ export async function loadInbox(): Promise<InboxInquiry[]> {
     if (!latest.has(message.inquiry_id)) latest.set(message.inquiry_id, message.body);
   }
 
-  return inquiries.data.map((row) => ({
+  const rows = inquiries.data.map((row) => ({
     id: row.id,
     name: row.name,
     email: row.email,
@@ -120,6 +134,10 @@ export async function loadInbox(): Promise<InboxInquiry[]> {
     unread_count: row.owner_unread,
     last_message_at: row.last_message_at,
   }));
+  return {
+    inquiries: rows,
+    unread_total: rows.reduce((sum, row) => sum + row.unread_count, 0),
+  };
 }
 
 /**
@@ -144,7 +162,7 @@ export async function loadThread(inquiryId: string): Promise<OwnerThread | null>
     supabase.from("listings").select("title").eq("id", loaded.data.listing_id).maybeSingle(),
     supabase
       .from("messages")
-      .select("id, sender_role, body, created_at")
+      .select("id, sender_role, body, emailed, created_at")
       .eq("inquiry_id", inquiryId)
       .order("created_at", { ascending: true }),
   ]);
@@ -175,6 +193,7 @@ export async function loadThread(inquiryId: string): Promise<OwnerThread | null>
       id: message.id,
       sender_role: message.sender_role,
       body: message.body,
+      emailed: message.emailed === true,
       created_at: message.created_at,
     })),
   };
@@ -237,6 +256,7 @@ export async function loadOwnerListings(): Promise<OwnerListingCard[]> {
   return rows.map((row) => {
     const stored = row.setup_step ?? undefined;
     const step: ListingStepId | null = isListingStep(stored) ? stored : null;
+    const progress = listingStepProgress(step);
     const cover = coverPath.get(row.id);
     return {
       id: row.id,
@@ -245,6 +265,10 @@ export async function loadOwnerListings(): Promise<OwnerListingCard[]> {
       cover_url: cover ? (signed.get(cover) ?? null) : null,
       city: locationById(row.location_id)?.name ?? null,
       setup_step: step,
+      step_index: progress.step_index,
+      step_count: progress.step_count,
+      next_step_label: progress.next_step_label,
+      status_group: listingStatusGroup(row.status),
       percent_complete: listingPercent({
         title: row.title,
         description: row.description,
@@ -294,7 +318,7 @@ export async function loadSettings(): Promise<SettingsProfile | null> {
   if (!user) return null;
   const profile = await supabase
     .from("profiles")
-    .select("full_name, email, phone, notify_email")
+    .select("full_name, email, phone, notify_new_inquiry, notify_new_message, notify_listing_status")
     .eq("id", user.id)
     .maybeSingle();
   if (profile.error || !profile.data) return null;
@@ -302,6 +326,8 @@ export async function loadSettings(): Promise<SettingsProfile | null> {
     full_name: profile.data.full_name,
     email: user.email ?? profile.data.email,
     phone: profile.data.phone,
-    notify_email: profile.data.notify_email !== false,
+    notify_new_inquiry: profile.data.notify_new_inquiry !== false,
+    notify_new_message: profile.data.notify_new_message !== false,
+    notify_listing_status: profile.data.notify_listing_status !== false,
   };
 }

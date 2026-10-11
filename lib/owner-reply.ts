@@ -19,3 +19,15 @@ export function replyFormError(error: z.ZodError): string {
   const path = error.issues[0]?.path[0];
   return path === "body" ? REPLY_BODY : REPLY_MISSING;
 }
+
+export const declineSchema = z.object({
+  inquiryId: z.string().uuid(),
+  note: z.string().trim().max(2000).optional(),
+});
+
+export const DECLINE_NOTE = "Keep the note under 2000 characters.";
+
+export function declineFormError(error: z.ZodError): string {
+  const path = error.issues[0]?.path[0];
+  return path === "note" ? DECLINE_NOTE : REPLY_MISSING;
+}

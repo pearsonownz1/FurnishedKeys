@@ -26,7 +26,7 @@ export async function loadRenterThread(token: string): Promise<RenterThread | nu
     service.from("listings").select("title").eq("id", inquiry.data.listing_id).maybeSingle(),
     service
       .from("messages")
-      .select("id, sender_role, body, created_at")
+      .select("id, sender_role, body, emailed, created_at")
       .eq("inquiry_id", inquiry.data.id)
       .order("created_at", { ascending: true }),
   ]);
@@ -39,6 +39,7 @@ export async function loadRenterThread(token: string): Promise<RenterThread | nu
       id: message.id,
       sender_role: message.sender_role,
       body: message.body,
+      emailed: message.emailed === true,
       created_at: message.created_at,
     })),
   };

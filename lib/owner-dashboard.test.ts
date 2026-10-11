@@ -1,22 +1,29 @@
 import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { setBlockedDates } from "@/app/(site)/owner/calendar-actions";
+import { confirmAvailability, setBlockedDates } from "@/app/(site)/owner/calendar-actions";
 import { renterReply } from "@/app/(site)/inquiry/actions";
 import { changePassword, saveProfile } from "@/app/(site)/owner/settings-actions";
 import { sessionUser } from "@/lib/api/owner-listing";
 import { deliverRenterMessageNotice } from "@/lib/email";
-import { loadThread } from "@/lib/owner-dashboard-load";
+import { loadInbox, loadThread } from "@/lib/owner-dashboard-load";
 import {
   applyBlockedDays,
   listingPercent,
+  listingStatusGroup,
+  listingStepProgress,
   resumeHref,
   stayHitsBlocked,
 } from "@/lib/owner-dashboard";
+import { revalidateListingPaths } from "@/lib/listings/revalidate-public";
 import { hashRenterToken } from "@/lib/renter-token";
 import { createServiceClient } from "@/lib/supabase/service";
 
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
+}));
+
+vi.mock("@/lib/listings/revalidate-public", () => ({
+  revalidateListingPaths: vi.fn(),
 }));
 
 vi.mock("@/lib/api/owner-listing", () => ({
@@ -157,12 +164,14 @@ describe("thread access", () => {
           id: "m1",
           sender_role: "owner",
           body: "Yes",
+          emailed: true,
           created_at: "2026-10-01T00:00:00.000Z",
         },
         {
           id: "m2",
           sender_role: "renter",
           body: "Thanks",
+          emailed: false,
           created_at: "2026-10-02T00:00:00.000Z",
         },
       ],
@@ -189,6 +198,7 @@ describe("thread access", () => {
     const thread = await loadThread(inquiryId);
 
     expect(thread?.messages.map((message) => message.sender_role)).toEqual(["owner", "renter"]);
+    expect(thread?.messages.map((message) => message.emailed)).toEqual([true, false]);
     expect(thread?.inquiry.owner_unread).toBe(0);
     expect(updateEq).toHaveBeenCalledWith("id", inquiryId);
   });
@@ -218,8 +228,15 @@ describe("renter reply", () => {
   });
 
   it("inserts a renter message and emails the owner", async () => {
-    const messageInsert = vi.fn().mockResolvedValue({ error: null });
+    const renterMessageId = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+    const messageInsert = vi.fn().mockReturnValue({
+      select: () => ({
+        single: vi.fn().mockResolvedValue({ data: { id: renterMessageId }, error: null }),
+      }),
+    });
     const updateEq = vi.fn().mockResolvedValue({ error: null });
+    const emailedEq = vi.fn().mockResolvedValue({ error: null });
+    const emailedUpdate = vi.fn().mockReturnValue({ eq: emailedEq });
     const gte = vi.fn().mockResolvedValue({ count: 0, error: null });
     const inquiryMaybe = vi.fn().mockResolvedValue({
       data: { id: inquiryId, listing_id: listingId, owner_unread: 0 },
@@ -235,6 +252,7 @@ describe("renter reply", () => {
           return {
             select: () => ({ eq: () => ({ eq: () => ({ gte }) }) }),
             insert: messageInsert,
+            update: emailedUpdate,
           };
         }
         if (table === "listings") {
@@ -267,6 +285,8 @@ describe("renter reply", () => {
       listingTitle: "Pine ADU",
       inquiryId,
     });
+    expect(emailedUpdate).toHaveBeenCalledWith({ emailed: true });
+    expect(emailedEq).toHaveBeenCalledWith("id", renterMessageId);
     expect(hashRenterToken(token)).toMatch(/^[0-9a-f]{64}$/);
   });
 
@@ -327,12 +347,15 @@ describe("settings", () => {
     const profile = new FormData();
     profile.set("full_name", "Ada");
     profile.set("phone", "541-555-0100");
-    profile.set("notify_email", "true");
+    profile.set("notify_new_inquiry", "true");
+    profile.set("notify_new_message", "on");
     expect(await saveProfile({ ok: false }, profile)).toEqual({ ok: true, success: true });
     expect(update).toHaveBeenCalledWith({
       full_name: "Ada",
       phone: "541-555-0100",
-      notify_email: true,
+      notify_new_inquiry: true,
+      notify_new_message: true,
+      notify_listing_status: false,
     });
 
     const password = new FormData();
@@ -363,5 +386,181 @@ describe("renter thread RLS", () => {
     expect(blocked).toContain("listing_blocked_dates_owner_all");
     expect(blocked).toContain("private.owns_listing(listing_id)");
     expect(blocked).toContain("grant insert, update, delete on table public.listing_blocked_dates to authenticated");
+    const layout = readFileSync(
+      new URL("../supabase/migrations/20261011184418_owner_dashboard_layout.sql", import.meta.url),
+      "utf8",
+    );
+    expect(layout).toContain("add value if not exists 'declined'");
+    expect(layout).toContain("notify_new_inquiry");
+    expect(layout).toContain("notify_new_message");
+    expect(layout).toContain("notify_listing_status");
+    expect(layout).toContain("drop column notify_email");
+    expect(layout).toContain("Only the server can mark a message emailed");
+  });
+});
+
+describe("listing cards", () => {
+  it("numbers the resume step and groups status for the filter tabs", () => {
+    expect(listingStepProgress("photos")).toEqual({
+      step_index: 3,
+      step_count: 10,
+      next_step_label: "Photos",
+    });
+    expect(listingStepProgress(null)).toEqual({
+      step_index: 1,
+      step_count: 10,
+      next_step_label: "Basics",
+    });
+    expect(listingStatusGroup("draft")).toBe("draft");
+    expect(listingStatusGroup("rejected")).toBe("draft");
+    expect(listingStatusGroup("changes_requested")).toBe("draft");
+    expect(listingStatusGroup("archived")).toBe("draft");
+    expect(listingStatusGroup("pending_review")).toBe("review");
+    expect(listingStatusGroup("approved")).toBe("live");
+  });
+});
+
+describe("confirmAvailability", () => {
+  it("stamps the public confirmation fields and revalidates the property page", async () => {
+    const windowEq = vi.fn().mockResolvedValue({ error: null });
+    const windowUpdate = vi.fn().mockReturnValue({ eq: windowEq });
+    const listingEq = vi.fn().mockResolvedValue({ error: null });
+    const listingUpdate = vi.fn().mockReturnValue({ eq: listingEq });
+    const listingMaybe = vi.fn().mockResolvedValue({
+      data: { id: listingId, slug: "pine-adu", owner_id: ownerId },
+      error: null,
+    });
+    vi.mocked(sessionUser).mockResolvedValue({
+      supabase: {
+        from(table: string) {
+          if (table === "availability_windows") return { update: windowUpdate };
+          return {
+            select: () => ({ eq: () => ({ maybeSingle: listingMaybe }) }),
+            update: listingUpdate,
+          };
+        },
+      } as unknown as Awaited<ReturnType<typeof sessionUser>>["supabase"],
+      user: { id: ownerId } as NonNullable<Awaited<ReturnType<typeof sessionUser>>["user"]>,
+    });
+
+    const result = await confirmAvailability(listingId);
+
+    expect(result).toEqual({ ok: true });
+    expect(windowUpdate).toHaveBeenCalledWith({
+      last_confirmed_at: expect.any(String),
+      confirmed_by: ownerId,
+    });
+    expect(listingUpdate).toHaveBeenCalledWith({
+      calendar_updated_at: expect.any(String),
+    });
+    expect(revalidateListingPaths).toHaveBeenCalledWith("pine-adu");
+  });
+
+  it("refuses another owner", async () => {
+    vi.mocked(sessionUser).mockResolvedValue({
+      supabase: {
+        from: () => ({
+          select: () => ({
+            eq: () => ({
+              maybeSingle: vi.fn().mockResolvedValue({
+                data: { id: listingId, slug: "pine-adu", owner_id: otherId },
+                error: null,
+              }),
+            }),
+          }),
+        }),
+      } as unknown as Awaited<ReturnType<typeof sessionUser>>["supabase"],
+      user: { id: ownerId } as NonNullable<Awaited<ReturnType<typeof sessionUser>>["user"]>,
+    });
+
+    expect(await confirmAvailability(listingId)).toEqual({
+      ok: false,
+      formError: "That listing is not yours.",
+    });
+    expect(revalidateListingPaths).not.toHaveBeenCalled();
+  });
+});
+
+describe("loadInbox", () => {
+  it("returns declined threads and the unread total", async () => {
+    vi.mocked(sessionUser).mockResolvedValue({
+      supabase: {
+        from(table: string) {
+          if (table === "listings") {
+            return {
+              select: () => ({
+                eq: vi.fn().mockResolvedValue({
+                  data: [{ id: listingId, title: "Pine ADU" }],
+                  error: null,
+                }),
+              }),
+            };
+          }
+          if (table === "messages") {
+            return {
+              select: () => ({
+                in: () => ({
+                  order: vi.fn().mockResolvedValue({ data: [], error: null }),
+                }),
+              }),
+            };
+          }
+          return {
+            select: () => ({
+              in: () => ({
+                order: vi.fn().mockResolvedValue({
+                  data: [
+                    {
+                      id: inquiryId,
+                      listing_id: listingId,
+                      name: "Ada",
+                      email: "delivered+renter@resend.dev",
+                      phone: null,
+                      move_in: "2026-11-01",
+                      move_out: null,
+                      occupants: 1,
+                      pets: null,
+                      status: "declined",
+                      message: "Hello",
+                      owner_unread: 1,
+                      last_message_at: "2026-10-11T00:00:00.000Z",
+                    },
+                    {
+                      id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+                      listing_id: listingId,
+                      name: "Bea",
+                      email: "delivered+bea@resend.dev",
+                      phone: null,
+                      move_in: "2026-12-01",
+                      move_out: null,
+                      occupants: 1,
+                      pets: null,
+                      status: "new",
+                      message: "Hi",
+                      owner_unread: 2,
+                      last_message_at: "2026-10-10T00:00:00.000Z",
+                    },
+                  ],
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        },
+      } as unknown as Awaited<ReturnType<typeof sessionUser>>["supabase"],
+      user: { id: ownerId } as NonNullable<Awaited<ReturnType<typeof sessionUser>>["user"]>,
+    });
+
+    const inbox = await loadInbox();
+    expect(inbox.unread_total).toBe(3);
+    expect(inbox.inquiries.map((row) => row.status)).toEqual(["declined", "new"]);
+  });
+
+  it("returns an empty inbox when signed out", async () => {
+    vi.mocked(sessionUser).mockResolvedValue({
+      supabase: {} as Awaited<ReturnType<typeof sessionUser>>["supabase"],
+      user: null,
+    });
+    expect(await loadInbox()).toEqual({ inquiries: [], unread_total: 0 });
   });
 });

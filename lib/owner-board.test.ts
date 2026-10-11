@@ -31,6 +31,7 @@ describe("owner board", () => {
   it("labels inquiry status and the time it arrived", () => {
     expect(inquiryStatusLabel("new")).toBe("New");
     expect(inquiryStatusLabel("responded")).toBe("Responded");
+    expect(inquiryStatusLabel("declined")).toBe("Declined");
     expect(receivedLabel("2026-10-11T18:30:00.000Z")).toBe("Oct 11, 2026, 11:30 AM");
   });
 

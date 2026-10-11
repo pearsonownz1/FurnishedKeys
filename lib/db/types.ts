@@ -55,7 +55,7 @@ export type FeeKind = (typeof feeKinds)[number];
 export const feeFrequencies = ["one_time", "monthly"] as const;
 export type FeeFrequency = (typeof feeFrequencies)[number];
 
-export const inquiryStatuses = ["new", "responded", "closed"] as const;
+export const inquiryStatuses = ["new", "responded", "closed", "declined"] as const;
 export type InquiryStatus = (typeof inquiryStatuses)[number];
 
 export const furnishedLevels = ["yes", "partly", "no"] as const;
@@ -87,8 +87,12 @@ export type Profile = {
   full_name: string | null;
   email: string | null;
   phone: string | null;
-  /** When false, inquiry and renter-message mail to this owner is skipped. */
-  notify_email: boolean;
+  /** When false, new-inquiry mail to this owner is skipped. Default true. */
+  notify_new_inquiry: boolean;
+  /** When false, renter-message mail to this owner is skipped. Default true. */
+  notify_new_message: boolean;
+  /** When false, approved, changes-requested, and rejected mail is skipped. Default true. */
+  notify_listing_status: boolean;
   role: UserRole;
   company_name: string | null;
   created_at: string;
@@ -256,6 +260,8 @@ export type Message = {
   sender_id: string | null;
   sender_role: "owner" | "renter";
   body: string;
+  /** True after Resend accepts the email to the other party. */
+  emailed: boolean;
   created_at: string;
 };
 
@@ -283,7 +289,15 @@ type WithOptional<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
 export type LocationInsert = WithOptional<Location, "id" | "active" | "sort">;
 export type ProfileInsert = WithOptional<
   Profile,
-  "full_name" | "email" | "phone" | "notify_email" | "role" | "company_name" | "created_at"
+  | "full_name"
+  | "email"
+  | "phone"
+  | "notify_new_inquiry"
+  | "notify_new_message"
+  | "notify_listing_status"
+  | "role"
+  | "company_name"
+  | "created_at"
 >;
 export type ListingInsert = WithOptional<
   Listing,
@@ -364,7 +378,7 @@ export type InquiryInsert = WithOptional<
 >;
 export type MessageInsert = WithOptional<
   Message,
-  "id" | "sender_id" | "sender_role" | "created_at"
+  "id" | "sender_id" | "sender_role" | "emailed" | "created_at"
 >;
 export type OwnerLeadInsert = WithOptional<
   OwnerLead,
