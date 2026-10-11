@@ -1,1 +1,50 @@
-# FurnishedKeys
+# Furnished Keys
+
+Marketplace for furnished monthly and extended-stay rentals — ADUs, apartments, rooms, and houses — launching in Bend and Deschutes County, Oregon, then across the Northwest.
+
+**Furnished homes. Flexible stays.** Find a furnished place for your next chapter—or let us help manage yours.
+
+Renters search and send an inquiry. Owners list a property for $199 or ask for a management consultation. This repository is the front end. Auth, payments, messaging, and booking are not built yet.
+
+## Stack
+
+- Next.js (App Router) + TypeScript + Tailwind CSS
+- ESLint and Vitest
+- `@supabase/ssr` browser and server clients
+
+Design tokens live in `app/globals.css` (warm white background, pine `#2e4a3b`, clay only as a tiny accent, 2px radius). Instrument Serif and Inter load through `next/font`. The soft shadow is reserved for the search bar.
+
+## Scripts
+
+```bash
+npm run dev
+npm run lint
+npm test
+npm run build
+```
+
+## Environment
+
+Copy `.env.example` for local work. Production values are set on the Vercel project `furnishedkeys`:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+
+`lib/supabase/client.ts` is the browser client. `lib/supabase/server.ts` is the server client (cookie adapter, no session middleware yet).
+
+## Locations
+
+Markets come from `lib/locations.ts`, shaped like the `locations` table: `id`, `slug`, `name`, `region`, `state`, `country`, `active`, `sort`. The seed is Bend, then Deschutes County. Components read that module. Do not hard-code a city name in the UI.
+
+## Backend boundary
+
+Schema, RLS, generated types, and seeds belong to Backend:
+
+- `supabase/`
+- `lib/db/types.ts`
+
+Do not add files at those paths from the front end. Listing fixtures in `lib/listings.ts` (homepage branch) match the listing tables so they can be swapped for a Supabase select later.
+
+## Not in this version
+
+Accounts, the $199 checkout, inquiry threads, and booking.

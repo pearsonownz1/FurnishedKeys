@@ -1,0 +1,124 @@
+@import "tailwindcss";
+
+/* Furnished Keys tokens v1 — warm paper, pine brand, clay reserved for tiny accents. */
+:root {
+  --bg: #faf8f4;
+  --surface: #ffffff;
+  --stone: #efebe4;
+  --line: #e3ded5;
+  --ink: #1b1e1c;
+  --muted: #62675f;
+  --pine: #2e4a3b;
+  --pine-d: #1f3429;
+  --pine-l: #e4ebe5;
+  --clay: #a8572f;
+  --ok: #2f6b4a;
+  --warn: #8a5a12;
+  --r: 2px;
+  --r-lg: 4px;
+  --sh: 0 1px 2px rgba(27, 30, 28, 0.06);
+  --sh-lg: 0 24px 48px -24px rgba(27, 30, 28, 0.35);
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --dur: 240ms;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-stone: var(--stone);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-pine: var(--pine);
+  --color-pine-d: var(--pine-d);
+  --color-pine-l: var(--pine-l);
+  --color-clay: var(--clay);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --font-sans: var(--font-inter), Inter, system-ui, sans-serif;
+  --font-serif: var(--font-instrument), "Instrument Serif", Georgia, serif;
+  --radius-fk: var(--r);
+  --radius-fk-lg: var(--r-lg);
+  --shadow-search: var(--sh-lg);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+}
+
+::selection {
+  background: var(--pine-l);
+  color: var(--ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--pine);
+  outline-offset: 2px;
+}
+
+/* Page column. At 1440px this is a 1200px measure with 120px gutters. */
+.shell {
+  width: min(1200px, calc(100% - 2.5rem));
+  margin-inline: auto;
+}
+
+.inset-x {
+  padding-inline: 1.25rem;
+}
+
+@media (min-width: 1280px) {
+  .shell {
+    width: min(1200px, calc(100% - 9rem));
+  }
+
+  .inset-x {
+    padding-inline: max(4.5rem, calc((100% - 1200px) / 2));
+  }
+}
+
+summary::-webkit-details-marker {
+  display: none;
+}
+
+summary {
+  list-style: none;
+}
+
+@keyframes fk-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.fk-rise {
+  animation: fk-rise var(--dur) var(--ease) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .fk-rise {
+    animation: none;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
