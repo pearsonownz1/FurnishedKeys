@@ -1,4 +1,5 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { paidThroughMonthYear, parseCheckoutPost, parseCheckoutStatus } from "./checkout";
 
@@ -37,38 +38,23 @@ describe("checkout response", () => {
     expect(parseCheckoutStatus({ status: "waived" })).toBeNull();
   });
 
-  it("formats the setup pill as month and year", () => {
+  it("formats a paid-through date for server responses", () => {
     expect(paidThroughMonthYear("2027-10-11T00:00:00.000Z")).toBe("Paid through Oct 2027");
   });
 
-  it("keeps pay on our page and mounts Stripe only with a secret and key", () => {
-    const source = readFileSync("components/listing/checkout-panel.tsx", "utf8");
-    const embed = readFileSync("components/listing/stripe-embed.tsx", "utf8");
+  it("leaves checkout on the server and keeps it out of the UI", () => {
     const route = readFileSync("app/api/listings/[id]/checkout/route.ts", "utf8");
-    expect(source).toContain("parseCheckoutPost");
-    expect(source).toContain("Pay {listingFeeAmount()} and set up my listing");
-    expect(source).toContain("Pay and start your listing");
-    expect(source).toContain("Your session ended.");
-    expect(source).toContain("Renew automatically each year.");
-    expect(source).toContain("Due today");
-    expect(source).not.toContain("Process payment");
-    expect(source).not.toContain("Order summary");
-    expect(source).toContain("paid_through");
-    expect(source).toContain("console.error");
-    expect(source).toContain("/sign-in?next=");
-    expect(source).toContain("checkoutError");
-    expect(source).not.toContain("We couldn't start checkout");
-    expect(source).toContain("clientSecret && publishableKey");
-    expect(source).toContain("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY");
-    expect(embed).toContain("loadStripe");
-    expect(source).not.toContain("loadStripe");
-    expect(source).not.toContain("Payments are being set up");
-    expect(source).not.toContain("Payments coming soon");
-    expect(source).not.toContain("appearance");
-    expect(source).not.toContain("branding_settings");
     expect(route).not.toContain("branding_settings");
     expect(route).not.toContain("appearance");
-    expect(source).not.toMatch(/refund/i);
-    expect(source).not.toContain("STRIPE_SECRET_KEY");
+    const walk = (current: string): string[] =>
+      readdirSync(current).flatMap((entry) => {
+        const path = join(current, entry);
+        return statSync(path).isDirectory() ? walk(path) : path.endsWith(".tsx") ? [path] : [];
+      });
+    const hits = ["app", "components"].flatMap(walk).filter((file) => {
+      const source = readFileSync(file, "utf8");
+      return /loadStripe|checkout-panel|stripe-embed|\/checkout|cancel-renewal|\/waive/.test(source);
+    });
+    expect(hits).toEqual([]);
   });
 });

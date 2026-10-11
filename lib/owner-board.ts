@@ -1,5 +1,4 @@
-import type { ListingFeeStatus, ListingStatus } from "@/lib/db/types";
-import { listingFeePaidLabel } from "@/lib/pricing";
+import type { ListingStatus } from "@/lib/db/types";
 
 export type BoardStatus = "live" | "in_review" | "changes_requested" | "draft" | "rejected";
 
@@ -48,10 +47,6 @@ export function statusLabel(status: BoardStatus): string {
   }
 }
 
-export function showsPaidThrough(status: BoardStatus): boolean {
-  return status === "live" || status === "in_review";
-}
-
 export function formatMonthDayYear(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "";
@@ -61,18 +56,6 @@ export function formatMonthDayYear(iso: string): string {
     year: "numeric",
     timeZone: "UTC",
   }).format(date);
-}
-
-export function paidOnLabel(iso: string): string {
-  return `Paid ${formatMonthDayYear(iso)}`;
-}
-
-export function paidThroughLabel(iso: string): string {
-  return `Paid through ${formatMonthDayYear(iso)}`;
-}
-
-export function endsOnLabel(iso: string): string {
-  return `Ends ${formatMonthDayYear(iso)}`;
 }
 
 export function confirmationIsStale(iso: string | null, now: Date): boolean {
@@ -86,12 +69,6 @@ export function confirmationBanner(listings: Pick<BoardListing, "lastConfirmedAt
   const stale = listings.some((listing) => confirmationIsStale(listing.lastConfirmedAt, now));
   if (!stale) return null;
   return "Confirm availability. At least one listing was last confirmed more than 14 days ago.";
-}
-
-export function queueFeeLabel(status: ListingFeeStatus): string {
-  if (status === "paid") return listingFeePaidLabel();
-  if (status === "waived") return "Waived";
-  return "Unpaid";
 }
 
 export function noteRequired(note: string): string | null {

@@ -6,7 +6,7 @@ import { activeLocations, locationShort } from "@/lib/locations";
 
 export const metadata = {
   title: "List a property",
-  description: "Start a furnished listing. The fee is billed yearly.",
+  description: "Free to list. We only earn when you rent.",
 };
 
 type Search = Record<string, string | string[] | undefined>;

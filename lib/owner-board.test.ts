@@ -4,8 +4,6 @@ import {
   confirmationBanner,
   confirmationIsStale,
   noteRequired,
-  paidOnLabel,
-  queueFeeLabel,
   statusLabel,
 } from "./owner-board";
 
@@ -28,11 +26,7 @@ describe("owner board", () => {
     expect(confirmationBanner([{ lastConfirmedAt: "2026-10-10T00:00:00.000Z" }], now)).toBeNull();
   });
 
-  it("formats the in-review paid date and the queue fee", () => {
-    expect(paidOnLabel("2026-10-11T00:00:00.000Z")).toBe("Paid Oct 11, 2026");
-    expect(queueFeeLabel("paid")).toBe("$199/yr paid");
-    expect(queueFeeLabel("waived")).toBe("Waived");
-    expect(queueFeeLabel("unpaid")).toBe("Unpaid");
+  it("requires a note before a non-approval review", () => {
     expect(noteRequired("  ")).toBe("Add a note before you continue.");
     expect(noteRequired("Need a clearer photo.")).toBeNull();
   });

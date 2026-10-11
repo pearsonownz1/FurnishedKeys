@@ -88,6 +88,7 @@ describe("listing catalog", () => {
     expect(source).toContain("listingPublicColumns.join");
     expect(source).toContain('.eq("status", "approved")');
     expect(source).not.toContain('.in("listing_fee_status", ["paid", "waived"])');
+    expect(source).not.toContain("listing_fee_status");
     expect(source).not.toMatch(/\.eq\(\s*"is_demo"/);
     expect(source).not.toMatch(/select\([^)]*address_private/);
     expect(source).not.toContain("listing_address");

@@ -40,7 +40,7 @@ type CatalogNumber =
   | "max_occupants"
   | "monthly_rent_cents";
 
-/** Approved catalog row after null stub fields are coerced. Public RLS already hides unpaid listings. */
+/** Approved catalog row after null stub fields are coerced. The query does not filter on the listing fee. */
 export type PublicListing = Omit<ListingPublic, CatalogText | CatalogNumber> & {
   title: string;
   slug: string;

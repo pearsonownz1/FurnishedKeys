@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { formatCents } from "@/lib/money";
-import { noteRequired, queueFeeLabel, statusLabel } from "@/lib/owner-board";
+import { noteRequired, statusLabel } from "@/lib/owner-board";
 import type { ReviewModel } from "@/lib/admin-queue";
 
 const checks = [
@@ -16,7 +16,6 @@ export function ReviewDetail({ listing }: { listing: ReviewModel }) {
   const [note, setNote] = useState(listing.adminNote ?? "");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
 
   async function review(action: "approve" | "request_changes" | "reject") {
     if (action !== "approve") {
@@ -54,27 +53,7 @@ export function ReviewDetail({ listing }: { listing: ReviewModel }) {
               ? "rejected"
               : current.status,
       adminNote: body.listing?.admin_note ?? note.trim(),
-      feeStatus: body.listing?.listing_fee_status ?? current.feeStatus,
-      renewalCanceled: body.listing?.renewal_canceled ?? current.renewalCanceled,
     }));
-    setMenuOpen(false);
-  }
-
-  async function waive() {
-    setPending(true);
-    setError(null);
-    const response = await fetch(`/api/admin/listings/${row.id}/waive`, { method: "POST" });
-    const body = (await response.json().catch(() => null)) as {
-      error?: string;
-      listing?: { listing_fee_status?: ReviewModel["feeStatus"] };
-    } | null;
-    setPending(false);
-    if (!response.ok) {
-      setError(body?.error ?? "We couldn't waive the fee.");
-      return;
-    }
-    setRow((current) => ({ ...current, feeStatus: body?.listing?.listing_fee_status ?? "waived" }));
-    setMenuOpen(false);
   }
 
   return (
@@ -107,7 +86,6 @@ export function ReviewDetail({ listing }: { listing: ReviewModel }) {
       <aside className="h-fit border border-line bg-surface px-5 py-5">
         <div className="flex flex-wrap items-center gap-2">
           <span className="rounded-[2px] bg-stone px-2 py-0.5 text-xs font-semibold">{statusLabel(row.status)}</span>
-          <span className="text-sm text-muted">{queueFeeLabel(row.feeStatus)}</span>
         </div>
         <h2 className="mt-4 text-sm font-semibold">Before you publish</h2>
         <ul className="mt-3 space-y-2 text-sm leading-relaxed">
@@ -131,9 +109,6 @@ export function ReviewDetail({ listing }: { listing: ReviewModel }) {
             {error}
           </p>
         ) : null}
-        {row.status === "rejected" ? (
-          <p className="mt-3 text-sm text-warn">Yearly renewal is off for this listing.</p>
-        ) : null}
         <div className="mt-4 grid gap-2">
           <button
             type="button"
@@ -151,9 +126,6 @@ export function ReviewDetail({ listing }: { listing: ReviewModel }) {
           >
             Request changes
           </button>
-          <p className="text-xs leading-relaxed text-muted">
-            Rejecting turns off the yearly renewal for this listing.
-          </p>
           <button
             type="button"
             disabled={pending}
@@ -162,24 +134,6 @@ export function ReviewDetail({ listing }: { listing: ReviewModel }) {
           >
             Reject
           </button>
-        </div>
-        <div className="relative mt-4">
-          <button
-            type="button"
-            aria-expanded={menuOpen}
-            aria-label="More actions"
-            onClick={() => setMenuOpen((open) => !open)}
-            className="rounded-[2px] border border-line px-3 py-1.5 text-sm"
-          >
-            ⋯
-          </button>
-          {menuOpen ? (
-            <div className="absolute left-0 z-10 mt-1 w-40 border border-line bg-surface p-1 shadow-search">
-              <button type="button" className="block w-full px-3 py-2 text-left text-sm hover:bg-stone" onClick={() => void waive()}>
-                Waive fee
-              </button>
-            </div>
-          ) : null}
         </div>
       </aside>
     </div>

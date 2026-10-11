@@ -46,9 +46,9 @@ Enums:
 
 A stub draft may leave `slug`, `title`, `bedrooms`, `bathrooms`, `max_occupants`, and `monthly_rent_cents` null. Submit checks completeness in the API. An approved row must have a title, a description, and rent greater than zero. `listing_fee_status` is not part of that check.
 
-`source` is a short slug, default `web`, with the same format check as `owner_leads.source` (`^[a-z0-9_-]{1,40}$`). Owners can set it on insert and cannot change it later. `renewal_canceled` mirrors Stripe `cancel_at_period_end` when a subscription exists. `paid_at` and `admin_note` are for the owner dashboard. `fee_paid_through` is the end of a recorded fee period. Listing is free; those fee columns stay for a later commission and do not gate submit, approval, or the catalog.
+`source` is a short slug, default `web`, with the same format check as `owner_leads.source` (`^[a-z0-9_-]{1,40}$`). Owners can set it on insert and cannot change it later. `renewal_canceled` mirrors Stripe `cancel_at_period_end` when a subscription exists. `paid_at` and `admin_note` are for the owner dashboard. `fee_paid_through` is the end of a recorded fee period. Listing is free; those fee columns stay and do not gate submit, approval, or the catalog.
 
-The public catalog (and child rows, and public photo reads) shows a listing when `status` is `approved`. `private.listing_is_public` is that same check. Demo rows stay visible because they are approved.
+The public catalog (and child rows, and public photo reads) shows a listing when `status` is `approved`. `private.listing_is_public` is that same check. The app query does not filter on `listing_fee_status`. Demo rows stay visible because they are approved.
 
 ### `listing_payments`
 
@@ -180,7 +180,7 @@ Each has utilities, a refundable deposit, and either cleaning or a pet fee, plus
 
 ## Listing fee
 
-Listing is free. Submit and approve do not look at `listing_fee_status` or `fee_paid_through`. The checkout, status, cancel-renewal, and Stripe webhook routes are still deployed and unused while the fee UI is removed. The columns and `listing_payments` stay so a later commission can reuse them.
+Listing is free. Submit and approve do not look at `listing_fee_status` or `fee_paid_through`. The site does not call checkout, and old `/plan` and `/checkout` URLs redirect to setup. The checkout, status, cancel-renewal, and Stripe webhook routes remain for Backend. The columns and `listing_payments` stay for a later share of rent and do not gate submit, approval, or the catalog.
 
 When `STRIPE_SECRET_KEY` is set, checkout is Stripe Embedded Checkout (`ui_mode: embedded_page` on the current Stripe API; this is the inline card, name, and ZIP form, not a hosted redirect). `POST /api/listings/[id]/checkout` accepts `{ auto_renew }` (default true) and returns `{ client_secret }`. The return URL is `/owners/listings/{id}/setup?session_id={CHECKOUT_SESSION_ID}`. When `auto_renew` is false, the webhook sets `cancel_at_period_end` on the new subscription. `GET /api/listings/[id]/checkout/status?session_id=` returns `{ status, paid_through }` from Stripe so the setup page can confirm before the webhook lands. A waived listing skips Stripe and that GET returns `{ status: "waived", paid_through }`.
 

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { toOwnerLeadInsert, validateOwnerLead, type OwnerLeadInput } from "./leads";
-import { listMyPropertyLabel, listingFeeCadenceLabel } from "./pricing";
+import { FREE_TO_LIST, listMyPropertyLabel } from "./pricing";
 
 const base: OwnerLeadInput = {
   name: "QA test – delete",
@@ -72,8 +72,8 @@ describe("owner lead insert", () => {
     expect(action).toContain("logInsertError");
     expect(action).not.toMatch(/\.insert\([\s\S]*?\)\s*\.select\(/);
     expect(action).not.toMatch(/\.single\(/);
-    expect(listMyPropertyLabel()).toBe("List my property — $199/year");
-    expect(listingFeeCadenceLabel()).toBe("/year per listing");
+    expect(listMyPropertyLabel()).toBe("List my property");
+    expect(FREE_TO_LIST).toBe("Free to list. We only earn when you rent.");
 
     const page = readFileSync(new URL("../app/(site)/owners/page.tsx", import.meta.url), "utf8");
     const start = readFileSync(new URL("../components/listing/start-form.tsx", import.meta.url), "utf8");
@@ -87,8 +87,7 @@ describe("owner lead insert", () => {
       "Pricing set in your free assessment",
       "Get a rental assessment",
       "listMyPropertyLabel()",
-      "listingFeeAmount()",
-      "listingFeeCadenceLabel()",
+      "FREE_TO_LIST",
       "/owners/start?src=",
       "<AssessmentForm source={source} />",
     ]) {

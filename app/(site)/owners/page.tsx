@@ -5,12 +5,11 @@ import { Suspense } from "react";
 import { AssessmentForm } from "@/components/owners/assessment-form";
 import { sanitizeSource } from "@/lib/leads";
 import { ownersKicker, ownersRegionName } from "@/lib/owners-copy";
-import { listMyPropertyLabel, listingFeeAmount, listingFeeCadenceLabel } from "@/lib/pricing";
+import { FREE_TO_LIST, listMyPropertyLabel } from "@/lib/pricing";
 
 export const metadata = {
   title: "List your property",
-  description:
-    "List a furnished home for monthly stays, or ask for a free rental assessment.",
+  description: FREE_TO_LIST,
 };
 
 type Search = Record<string, string | string[] | undefined>;
@@ -110,8 +109,9 @@ async function OwnersLanding({ searchParams }: { searchParams: Promise<Search> }
             <h3 className="mt-3 font-serif text-[clamp(1.75rem,3vw,2.25rem)] leading-none font-normal">
               Your listing, your renters
             </h3>
-            <p className="mt-6 font-serif text-[56px] leading-none text-pine">{listingFeeAmount()}</p>
-            <p className="mt-1 text-sm text-muted">{listingFeeCadenceLabel()}</p>
+            <p className="mt-6 max-w-sm font-serif text-[clamp(1.75rem,3vw,2.25rem)] leading-tight text-pine">
+              {FREE_TO_LIST}
+            </p>
             <ul className="mt-8">
               {selfPoints.map((point) => (
                 <li key={point} className="flex items-start gap-3 border-t border-line py-3 text-[15px] leading-relaxed">

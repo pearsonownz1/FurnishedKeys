@@ -14,7 +14,7 @@ import {
 } from "@/lib/listings";
 import { launchKicker, primaryLocation } from "@/lib/locations";
 import { signedPhotoUrls } from "@/lib/photos";
-import { listingFeeAmount } from "@/lib/pricing";
+import { FREE_TO_LIST } from "@/lib/pricing";
 
 const steps = [
   {
@@ -168,11 +168,8 @@ export function HomePage() {
                     Your listing, messages and calendar
                   </p>
                 </div>
-                <p className="font-serif text-[28px] leading-none">
-                  {listingFeeAmount()}
-                  <span className="ml-1 font-sans text-lg tracking-normal text-[#c9d5cc]">
-                    /year
-                  </span>
+                <p className="max-w-[14rem] text-right font-serif text-lg leading-snug">
+                  {FREE_TO_LIST}
                 </p>
               </div>
               <div className="flex items-center justify-between gap-4 bg-pine-d px-5 py-[18px]">

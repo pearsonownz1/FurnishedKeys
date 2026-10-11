@@ -66,7 +66,7 @@ export function StartForm({
       setError(body?.error ?? "We couldn't start this listing. Please try again.");
       return;
     }
-    router.push(`/owners/listings/${body.listing_id}/plan`);
+    router.push(`/owners/listings/${body.listing_id}/setup`);
   }
 
   return (

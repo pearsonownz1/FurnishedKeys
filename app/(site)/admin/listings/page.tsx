@@ -3,7 +3,7 @@ import { connection } from "next/server";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { loadReviewQueue } from "@/lib/admin-queue";
-import { queueFeeLabel, statusLabel } from "@/lib/owner-board";
+import { statusLabel } from "@/lib/owner-board";
 
 export const metadata = {
   title: "Review queue",
@@ -45,7 +45,6 @@ async function Queue() {
                   <span className="font-semibold">{listing.title}</span>
                   <span className="mt-1 block text-sm text-muted">{statusLabel(listing.status)}</span>
                 </span>
-                <span className="text-sm">{queueFeeLabel(listing.feeStatus)}</span>
               </Link>
             </li>
           ))}

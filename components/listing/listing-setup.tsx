@@ -45,13 +45,11 @@ export function ListingSetup({
   initial,
   initialStep,
   placeLabel,
-  paidThroughLabel,
 }: {
   listingId: string;
   initial: ListingDraft;
   initialStep: ListingStepId;
   placeLabel: string;
-  paidThroughLabel: string | null;
 }) {
   const router = useRouter();
   const [draft, setDraft] = useState(initial);
@@ -207,6 +205,12 @@ export function ListingSetup({
     void setListingCover(listingId, photoId);
   }
 
+  async function signOut() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/sign-in");
+  }
+
   async function submit() {
     setSubmitting(true);
     setError(null);
@@ -235,10 +239,6 @@ export function ListingSetup({
       if (next) go(next);
       return;
     }
-    if (response.status === 402) {
-      setError("Payment needed");
-      return;
-    }
     setError(body?.error ?? "We couldn't submit this listing. Please try again.");
   }
 
@@ -249,6 +249,13 @@ export function ListingSetup({
         <p className="mt-4 max-w-xl text-sm text-muted">
           We&apos;ll look at it before it goes live.
         </p>
+        <button
+          type="button"
+          className="mt-8 text-sm font-semibold text-pine"
+          onClick={() => void signOut()}
+        >
+          Sign out
+        </button>
       </div>
     );
   }
@@ -292,7 +299,6 @@ export function ListingSetup({
           </ol>
           <div className="mt-4 space-y-1 text-sm text-muted">
             <p>{saving ? "Saving draft…" : saved ? "Draft saved" : "Draft not saved"}</p>
-            {paidThroughLabel ? <p>{paidThroughLabel}</p> : null}
           </div>
         </div>
 
@@ -300,14 +306,6 @@ export function ListingSetup({
           {error ? (
             <p className="mb-4 text-sm text-warn" role="alert">
               {error}
-              {error === "Payment needed" ? (
-                <>
-                  {" "}
-                  <a className="font-semibold text-pine" href={`/owners/listings/${listingId}/checkout`}>
-                    Go to checkout
-                  </a>
-                </>
-              ) : null}
             </p>
           ) : null}
           {gaps.length > 0 ? (
