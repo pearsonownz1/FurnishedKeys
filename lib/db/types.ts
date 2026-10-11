@@ -147,7 +147,8 @@ export type ListingPaymentStatus =
   | "payment_failed"
   | "subscription_deleted"
   | "cancel_scheduled"
-  | "cancel_cleared";
+  | "cancel_cleared"
+  | "waived_no_stripe";
 
 export type ListingPayment = {
   id: string;
