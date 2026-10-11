@@ -14,7 +14,7 @@ import {
   propertyTypeLabel,
   sortByRecentConfirmation,
 } from "@/lib/listings";
-import { locationBySlug } from "@/lib/locations";
+import { loadWhereLocations } from "@/lib/locations-load";
 import { formatCents } from "@/lib/money";
 import { signedPhotoUrls } from "@/lib/photos";
 import { canonical } from "@/lib/site";
@@ -51,9 +51,11 @@ async function RentalsResults({
   let catalogError = false;
   let items: BrowseItem[] = [];
 
+  const places = await loadWhereLocations();
+
   try {
     const listings = sortByRecentConfirmation(
-      filterListings(await getPublicListings(), query),
+      filterListings(await getPublicListings(), query, places),
     );
     const photos = await signedPhotoUrls(listings);
     items = listings.map((listing) => {
@@ -81,7 +83,7 @@ async function RentalsResults({
     catalogError = true;
   }
 
-  const place = query.where ? locationBySlug(query.where) : undefined;
+  const place = query.where ? places.find((item) => item.slug === query.where) : undefined;
   const title = place ? `Furnished rentals in ${place.name}` : "Furnished rentals";
   const noun = items.length === 1 ? "listing" : "listings";
   const demoNoun = items.length === 1 ? "demo listing" : "demo listings";
@@ -92,7 +94,12 @@ async function RentalsResults({
 
   return (
     <div className="lg:flex lg:h-[calc(100dvh-4rem)] lg:flex-col">
-      <FilterBar key={summary + view + (query.where ?? "")} query={query} moveIns={moveInOptions(new Date())} />
+      <FilterBar
+        key={summary + view + (query.where ?? "")}
+        query={query}
+        moveIns={moveInOptions(new Date())}
+        places={places}
+      />
       <div className="lg:min-h-0 lg:flex-1">
         <BrowseBoard
           items={items}
@@ -100,6 +107,11 @@ async function RentalsResults({
           summary={summary}
           view={view}
           catalogError={catalogError}
+          placeCenter={
+            place && place.lat !== null && place.lng !== null
+              ? { lat: place.lat, lng: place.lng }
+              : null
+          }
         />
       </div>
     </div>

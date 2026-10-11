@@ -86,6 +86,12 @@ export type Location = {
   country: string;
   active: boolean;
   sort: number;
+  /** Where-dropdown order. Bend is 1. The county row is last. */
+  sort_order: number;
+  /** County location this city belongs to. Null for a county or a city with no county row. */
+  parent_id: string | null;
+  lat: number | null;
+  lng: number | null;
 };
 
 export type Profile = {
@@ -302,7 +308,10 @@ export type OwnerLead = {
 
 type WithOptional<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
 
-export type LocationInsert = WithOptional<Location, "id" | "active" | "sort">;
+export type LocationInsert = WithOptional<
+  Location,
+  "id" | "active" | "sort" | "sort_order" | "parent_id" | "lat" | "lng"
+>;
 export type ProfileInsert = WithOptional<
   Profile,
   | "full_name"

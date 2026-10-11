@@ -1,6 +1,6 @@
 "use client";
 
-import { activeLocations, locationShort } from "@/lib/locations";
+import { locationShort } from "@/lib/locations";
 import {
   budgetOptions,
   formatMonthDay,
@@ -54,12 +54,13 @@ function bedsLabel(query: ListingQuery): string {
 export function FilterBar({
   query,
   moveIns,
+  places,
 }: {
   query: ListingQuery;
   moveIns: { value: string; label: string }[];
+  places: { id: string; slug: string; name: string; state: string }[];
 }) {
   const router = useRouter();
-  const places = activeLocations();
   const place = places.find((item) => item.slug === query.where);
   const budget = budgetOptions.find((item) => Number(item.value) === query.budgetCents);
   const mapOn = query.view === "map";

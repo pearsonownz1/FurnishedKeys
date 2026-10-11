@@ -158,7 +158,16 @@ async function readCatalog(): Promise<PublicListing[]> {
   const rooms = groupByListing((roomsResult.data ?? []) as ListingBedroom[]);
   const blocked = groupByListing((blockedResult.data ?? []) as ListingBlockedDate[]);
   const locations = new Map(
-    (locationsResult.data ?? []).map((location) => [location.id, location]),
+    (locationsResult.data ?? []).map((location) => [
+      location.id,
+      {
+        ...location,
+        sort: asNumber(location.sort) ?? 0,
+        sort_order: asNumber(location.sort_order) ?? 0,
+        lat: asNumber(location.lat),
+        lng: asNumber(location.lng),
+      },
+    ]),
   );
 
   return listings.flatMap((listing) => {
@@ -197,16 +206,25 @@ export const getListingBySlug = cache(async (slug: string) => {
   return listings.find((listing) => listing.slug === slug) ?? null;
 });
 
+export type LocationMatch = {
+  id: string;
+  slug: string;
+};
+
 export function filterListings(
   listings: PublicListing[],
   query: ListingQuery,
+  directory: LocationMatch[] = [],
 ): PublicListing[] {
   return listings.filter((listing) => {
     if (query.where) {
+      const selected = directory.find((place) => place.slug === query.where);
       const regionSlug = listing.location.region.toLowerCase().replaceAll(" ", "-");
       const inPlace = listing.location.slug === query.where;
       const inRegion = regionSlug === query.where;
-      if (!inPlace && !inRegion) return false;
+      const inCounty =
+        selected !== undefined && listing.location.parent_id === selected.id;
+      if (!inPlace && !inRegion && !inCounty) return false;
     }
 
     if (
