@@ -5,4 +5,5 @@ export function revalidateListingPaths(slug: string | null | undefined) {
   if (slug) revalidatePath(`/rentals/${slug}`);
   revalidatePath("/rentals");
   revalidatePath("/");
+  revalidatePath("/sitemap.xml");
 }
