@@ -10,58 +10,37 @@ export type GalleryPhoto = {
 
 export function Gallery({ photos }: { photos: GalleryPhoto[] }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
-  const visible = photos.slice(0, 3);
   const count = photos.length;
+  const featured = photos[0];
+  const thumbs = photos.slice(1, 5);
+
+  if (!featured) {
+    return <div className="min-h-[220px] bg-stone" />;
+  }
 
   return (
     <>
-      <div
-        className={
-          visible.length >= 3
-            ? "grid grid-cols-1 gap-2 sm:grid-cols-[2fr_1fr] sm:grid-rows-2 sm:h-[408px]"
-            : "grid grid-cols-1 gap-2"
-        }
-      >
-        {visible.map((photo, index) => (
-          <div
-            key={`${photo.alt}-${index}`}
-            className={`relative overflow-hidden rounded-[2px] bg-stone ${
-              visible.length >= 3 && index === 0
-                ? "min-h-[220px] sm:row-span-2 sm:min-h-0"
-                : "min-h-[160px] sm:min-h-0"
-            }`}
-          >
-            {photo.src ? (
-              <Image
-                src={photo.src}
-                alt={photo.alt}
-                fill
-                priority={index === 0}
-                unoptimized
-                sizes={index === 0 ? "(min-width: 1024px) 720px, 100vw" : "360px"}
-                className="object-cover"
-              />
-            ) : null}
-            {index === visible.length - 1 && count > 0 ? (
-              <button
-                type="button"
-                className="absolute right-3 bottom-3 rounded-[2px] bg-surface px-2.5 py-1.5 text-xs font-semibold text-ink"
-                onClick={() => dialogRef.current?.showModal()}
-              >
-                All {count} {count === 1 ? "photo" : "photos"}
-              </button>
-            ) : null}
-          </div>
+      <div className="relative grid grid-cols-1 gap-2 md:grid-cols-4 md:grid-rows-2 md:h-[440px]">
+        <PhotoTile photo={featured} large priority />
+        {thumbs.map((photo, index) => (
+          <PhotoTile key={`${photo.alt}-${index}`} photo={photo} />
         ))}
+        {count > 0 ? (
+          <button
+            type="button"
+            className="absolute right-3 bottom-3 rounded-[2px] bg-surface px-2.5 py-1.5 text-xs font-semibold text-ink"
+            onClick={() => dialogRef.current?.showModal()}
+          >
+            Show all photos ({count})
+          </button>
+        ) : null}
       </div>
       <dialog
         ref={dialogRef}
         className="w-[min(960px,calc(100%-2rem))] bg-bg p-4 text-ink backdrop:bg-ink/40"
       >
         <div className="mb-3 flex items-center justify-between gap-3">
-          <p className="text-sm font-semibold">
-            All {count} {count === 1 ? "photo" : "photos"}
-          </p>
+          <p className="text-sm font-semibold">Show all photos ({count})</p>
           <button
             type="button"
             className="rounded-[2px] border border-line px-3 py-1.5 text-sm"
@@ -72,28 +51,42 @@ export function Gallery({ photos }: { photos: GalleryPhoto[] }) {
         </div>
         <div className="grid gap-3">
           {photos.map((photo, index) => (
-            <div
-              key={`${photo.alt}-full-${index}`}
-              className="relative aspect-[4/3] bg-stone"
-            >
-              {photo.src ? (
-                <Image
-                  src={photo.src}
-                  alt={photo.alt}
-                  fill
-                  unoptimized
-                  sizes="960px"
-                  className="object-cover"
-                />
-              ) : (
-                <p className="absolute inset-0 grid place-items-center text-sm text-muted">
-                  Photo unavailable
-                </p>
-              )}
-            </div>
+            <PhotoTile key={`${photo.alt}-full-${index}`} photo={photo} large />
           ))}
         </div>
       </dialog>
     </>
+  );
+}
+
+function PhotoTile({
+  photo,
+  large = false,
+  priority = false,
+}: {
+  photo: GalleryPhoto;
+  large?: boolean;
+  priority?: boolean;
+}) {
+  return (
+    <div
+      className={`relative overflow-hidden bg-stone ${
+        large ? "min-h-[220px] md:col-span-2 md:row-span-2 md:min-h-0" : "min-h-[120px] md:min-h-0"
+      }`}
+    >
+      {photo.src ? (
+        <Image
+          src={photo.src}
+          alt={photo.alt}
+          fill
+          priority={priority}
+          unoptimized
+          sizes={large ? "(min-width: 1024px) 720px, 100vw" : "240px"}
+          className="object-cover"
+        />
+      ) : (
+        <p className="absolute inset-0 grid place-items-center text-sm text-muted">Photo unavailable</p>
+      )}
+    </div>
   );
 }

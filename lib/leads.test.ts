@@ -74,6 +74,30 @@ describe("owner lead insert", () => {
     expect(action).not.toMatch(/\.single\(/);
     expect(listMyPropertyLabel()).toBe("List my property — $199/year");
     expect(listingFeeCadenceLabel()).toBe("/year per listing");
+
+    const page = readFileSync(new URL("../app/(site)/owners/page.tsx", import.meta.url), "utf8");
+    const start = readFileSync(new URL("../components/listing/start-form.tsx", import.meta.url), "utf8");
+    const form = readFileSync(new URL("../components/owners/assessment-form.tsx", import.meta.url), "utf8");
+    for (const phrase of [
+      "Your furnished space",
+      "Two ways to work with us",
+      "Who&apos;s renting",
+      "How it works",
+      "We only publish a property after its owner submits and approves it.",
+      "Pricing set in your free assessment",
+      "Get a rental assessment",
+      "listMyPropertyLabel()",
+      "listingFeeAmount()",
+      "listingFeeCadenceLabel()",
+      "/owners/start?src=",
+      "<AssessmentForm source={source} />",
+    ]) {
+      expect(page).toContain(phrase);
+    }
+    expect(page).not.toMatch(/refund/i);
+    expect(form).toContain('name="source"');
+    expect(start).toContain("/api/owners/start");
+    expect(start).toContain("...(source ? { source } : {})");
   });
 
   it("accepts a written availability note", () => {

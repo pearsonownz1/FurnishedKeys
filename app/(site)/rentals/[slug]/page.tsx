@@ -2,29 +2,34 @@ import { connection } from "next/server";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
+import { StayCalendar } from "@/components/listing/stay-calendar";
 import { Gallery } from "@/components/property/gallery";
 import { InquiryCard } from "@/components/property/inquiry-card";
 import { PropertyMap } from "@/components/property/property-map";
+import { TrustStrip } from "@/components/property/trust-strip";
+import { expandRanges } from "@/lib/calendar-ranges";
 import {
-  bathLabel,
-  bedLabel,
-  confirmedDay,
   costTableFees,
   feeAmountLabel,
   getListingBySlug,
+  getPublicLandlord,
   getPublicListings,
-  managementLabel,
-  minimumStayLabel,
   monthlyTotalCents,
   petTag,
   primaryWindow,
-  propertyTypeLabel,
   sortedPhotos,
 } from "@/lib/listings";
 import { locationShort } from "@/lib/locations";
 import { formatCents } from "@/lib/money";
+import {
+  goodForTags,
+  groupedAmenities,
+  propertyFactLine,
+  propertyTypeName,
+  trustCells,
+} from "@/lib/property-display";
 import { signedPhotoUrls } from "@/lib/photos";
-import { addMonths, formatMonthDay, parseListingQuery } from "@/lib/search";
+import { addMonths, parseListingQuery } from "@/lib/search";
 
 export async function generateStaticParams() {
   try {
@@ -78,8 +83,8 @@ async function ListingBody({
   const query = parseListingQuery(await searchParams);
   const photos = sortedPhotos(listing);
   const signed = await signedPhotoUrls([listing]);
+  const landlord = await getPublicLandlord(listing.id);
   const window = primaryWindow(listing.availability_windows);
-  const confirmed = window?.last_confirmed_at;
   const moveIn =
     query.moveIn && window && query.moveIn >= window.available_from
       ? query.moveIn
@@ -89,14 +94,29 @@ async function ListingBody({
       ? query.stayMonths
       : listing.min_stay_months;
   const moveOut = moveIn ? addMonths(moveIn, stay) : "";
-  const facts = [
-    propertyTypeLabel(listing.property_type),
-    bedLabel(listing.bedrooms),
-    bathLabel(listing.bathrooms),
-    `Sleeps ${listing.max_occupants}`,
-    petTag(listing),
-    managementLabel(listing.management),
-  ];
+  const tags = goodForTags(listing.good_for ?? []);
+  const facts = propertyFactLine({
+    type: propertyTypeName(listing.property_type),
+    squareFeet: listing.square_feet,
+    bedrooms: listing.bedrooms,
+    bathrooms: listing.bathrooms,
+    pets: petTag(listing),
+  });
+  const cells = trustCells({
+    calendarUpdatedAt: listing.calendar_updated_at,
+    landlord,
+  });
+  const rooms =
+    listing.rooms.length > 0
+      ? [...listing.rooms].sort((left, right) => left.sort - right.sort)
+      : listing.bedrooms > 0
+        ? Array.from({ length: listing.bedrooms }, (_, index) => ({
+            id: `count-${index}`,
+            label: `Bedroom ${index + 1}`,
+            beds: null as string | null,
+          }))
+        : [];
+  const amenityGroups = groupedAmenities(listing.amenities);
   const point =
     listing.approx_lat !== null && listing.approx_lng !== null
       ? {
@@ -107,14 +127,7 @@ async function ListingBody({
           priceLabel: formatCents(listing.monthly_rent_cents),
         }
       : null;
-
-  const availabilityLine = [
-    window ? `Available ${formatMonthDay(window.available_from)}` : null,
-    confirmed ? `confirmed ${confirmedDay(confirmed)}` : null,
-    minimumStayLabel(listing.min_stay_months),
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const blocked = expandRanges(listing.blocked_dates);
 
   return (
     <article className="px-5 py-7 md:px-8 lg:px-16">
@@ -123,7 +136,7 @@ async function ListingBody({
           {locationShort(listing.location)}
         </Link>
         <span aria-hidden="true"> / </span>
-        <span>{propertyTypeLabel(listing.property_type)}</span>
+        <span>{propertyTypeName(listing.property_type)}</span>
         <span aria-hidden="true"> / </span>
         <span>{listing.title}</span>
         {listing.is_demo ? (
@@ -137,19 +150,70 @@ async function ListingBody({
         }))}
       />
       <div className="mt-8 grid items-start gap-10 lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-16">
-        <div>
+        <div className="min-w-0">
           <h1 className="font-serif text-[clamp(2.25rem,4vw,3rem)] leading-[1.05] font-normal tracking-[-0.6px]">
             {listing.title}
           </h1>
-          <ul className="mt-3.5 mb-5 flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted">
-            {facts.map((fact) => (
-              <li key={fact}>{fact}</li>
-            ))}
-          </ul>
+          {tags.length > 0 ? (
+            <ul className="mt-4 flex flex-wrap gap-2">
+              {tags.map((tag) => (
+                <li key={tag} className="rounded-[2px] border border-ink px-2.5 py-1 text-sm">
+                  {tag}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          <p className="mt-3.5 text-sm text-muted">{facts}</p>
+          <TrustStrip cells={cells} />
+
           {listing.description ? (
-            <p className="max-w-[620px] text-base leading-relaxed text-ink">
+            <p className="mt-8 max-w-[620px] text-base leading-relaxed text-ink">
               {listing.description}
             </p>
+          ) : null}
+          {listing.space_description ? (
+            <>
+              <h2 className="mt-8 mb-3 text-xs font-semibold tracking-[0.1em] text-muted uppercase">
+                The space
+              </h2>
+              <p className="max-w-[620px] text-base leading-relaxed">{listing.space_description}</p>
+            </>
+          ) : null}
+
+          {rooms.length > 0 ? (
+            <>
+              <h2 className="mt-8 mb-3 text-xs font-semibold tracking-[0.1em] text-muted uppercase">
+                Rooms & beds
+              </h2>
+              <ul className="grid gap-3 sm:grid-cols-2">
+                {rooms.map((room) => (
+                  <li key={room.id} className="border border-line px-4 py-4">
+                    <p className="text-sm font-semibold">{room.label}</p>
+                    {room.beds ? <p className="mt-1 text-sm text-muted">{room.beds}</p> : null}
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : null}
+
+          {amenityGroups.length > 0 ? (
+            <>
+              <h2 className="mt-8 mb-3 text-xs font-semibold tracking-[0.1em] text-muted uppercase">
+                Amenities
+              </h2>
+              <div className="grid gap-6 sm:grid-cols-2">
+                {amenityGroups.map((group) => (
+                  <div key={group.group || "more"}>
+                    {group.group ? <h3 className="text-sm font-semibold">{group.group}</h3> : null}
+                    <ul className="mt-2 space-y-1.5 text-sm">
+                      {group.labels.map((label) => (
+                        <li key={label}>{label}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            </>
           ) : null}
 
           <h2 className="mt-8 mb-3 text-xs font-semibold tracking-[0.1em] text-muted uppercase">
@@ -175,34 +239,19 @@ async function ListingBody({
             </div>
           </div>
 
-          {listing.amenities.length > 0 ? (
-            <>
-              <h2 className="mt-8 mb-3 text-xs font-semibold tracking-[0.1em] text-muted uppercase">
-                Amenities
-              </h2>
-              <ul className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-                {listing.amenities.map((amenity) => (
-                  <li key={amenity} className="text-sm">
-                    <span className="text-pine" aria-hidden="true">
-                      —{" "}
-                    </span>
-                    {amenity}
-                  </li>
-                ))}
-              </ul>
-            </>
-          ) : null}
+          <h2 className="mt-8 mb-3 text-xs font-semibold tracking-[0.1em] text-muted uppercase">
+            House rules
+          </h2>
+          <div className="max-w-[620px] space-y-2 text-[15px] leading-relaxed">
+            <p>{petTag(listing)}</p>
+            <p>{listing.smoking_allowed ? "Smoking allowed" : "No smoking"}</p>
+            {listing.house_rules ? <p>{listing.house_rules}</p> : null}
+          </div>
 
-          {listing.house_rules ? (
-            <>
-              <h2 className="mt-8 mb-3 text-xs font-semibold tracking-[0.1em] text-muted uppercase">
-                House rules
-              </h2>
-              <p className="max-w-[620px] text-[15px] leading-relaxed text-ink">
-                {listing.house_rules}
-              </p>
-            </>
-          ) : null}
+          <h2 className="mt-8 mb-3 text-xs font-semibold tracking-[0.1em] text-muted uppercase">
+            Availability
+          </h2>
+          <StayCalendar blocked={blocked} marked={window?.available_from} />
 
           <h2 className="mt-8 mb-3 text-xs font-semibold tracking-[0.1em] text-muted uppercase">
             Approximate location
@@ -219,7 +268,9 @@ async function ListingBody({
         <InquiryCard
           listingId={listing.id}
           rentLabel={formatCents(listing.monthly_rent_cents)}
-          availabilityLine={availabilityLine}
+          availabilityLine={
+            window ? `Available ${window.available_from}` : "Ask about availability"
+          }
           defaults={{ moveIn, moveOut, occupants: 1 }}
           constraints={{
             minStayMonths: listing.min_stay_months,

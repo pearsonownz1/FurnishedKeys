@@ -59,6 +59,7 @@ async function OwnersLanding({ searchParams }: { searchParams: Promise<Search> }
   const raw = params.src;
   const source = sanitizeSource(Array.isArray(raw) ? raw[0] : raw);
   const listLabel = listMyPropertyLabel();
+  const startHref = source ? `/owners/start?src=${encodeURIComponent(source)}` : "/owners/start";
   const region = ownersRegionName();
 
   return (
@@ -76,7 +77,7 @@ async function OwnersLanding({ searchParams }: { searchParams: Promise<Search> }
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Link
-              href="/list"
+              href={startHref}
               className="rounded-[2px] bg-pine px-5 py-3.5 text-center text-[15px] font-semibold text-white"
             >
               {listLabel}
@@ -126,7 +127,7 @@ async function OwnersLanding({ searchParams }: { searchParams: Promise<Search> }
               ))}
             </ul>
             <Link
-              href="/list"
+              href={startHref}
               className="mt-8 inline-block rounded-[2px] bg-pine px-5 py-3.5 text-[15px] font-semibold text-white"
             >
               {listLabel}
