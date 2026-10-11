@@ -3,7 +3,9 @@ import {
   boardStatus,
   confirmationBanner,
   confirmationIsStale,
+  inquiryStatusLabel,
   noteRequired,
+  receivedLabel,
   statusLabel,
 } from "./owner-board";
 
@@ -24,6 +26,12 @@ describe("owner board", () => {
       confirmationBanner([{ lastConfirmedAt: "2026-09-01T00:00:00.000Z" }], now),
     ).toMatch(/14 days/);
     expect(confirmationBanner([{ lastConfirmedAt: "2026-10-10T00:00:00.000Z" }], now)).toBeNull();
+  });
+
+  it("labels inquiry status and the time it arrived", () => {
+    expect(inquiryStatusLabel("new")).toBe("New");
+    expect(inquiryStatusLabel("responded")).toBe("Responded");
+    expect(receivedLabel("2026-10-11T18:30:00.000Z")).toBe("Oct 11, 2026, 11:30 AM");
   });
 
   it("requires a note before a non-approval review", () => {

@@ -1,9 +1,5 @@
-import {
-  formatMonthDayYear,
-  statusLabel,
-  type BoardInquiry,
-  type BoardListing,
-} from "@/lib/owner-board";
+import { OwnerInquiryCard } from "@/components/owner/inquiry-card";
+import { statusLabel, type BoardInquiry, type BoardListing } from "@/lib/owner-board";
 
 export function ListingBoard({
   listings,
@@ -38,18 +34,15 @@ export function ListingBoard({
       )}
 
       <h2 className="mt-14 font-serif text-[clamp(2rem,4vw,2.75rem)] leading-none font-normal tracking-[-0.6px]">
-        New inquiries
+        Inquiries
       </h2>
       {inquiries.length === 0 ? (
-        <p className="mt-4 text-sm text-muted">No new inquiries.</p>
+        <p className="mt-4 text-sm text-muted">No inquiries.</p>
       ) : (
-        <ul className="mt-6 grid gap-4 sm:grid-cols-2">
+        <ul className="mt-6 grid gap-4 lg:grid-cols-2">
           {inquiries.map((inquiry) => (
-            <li id={`inquiry-${inquiry.id}`} key={inquiry.id} className="border border-line bg-surface px-5 py-5">
-              <p className="text-xs tracking-[0.12em] text-muted uppercase">{inquiry.listingTitle}</p>
-              <p className="mt-2 font-semibold">{inquiry.name}</p>
-              <p className="mt-2 text-sm leading-relaxed">{inquiry.message}</p>
-              <p className="mt-3 text-xs text-muted">{formatMonthDayYear(inquiry.createdAt)}</p>
+            <li key={inquiry.id} className="min-w-0">
+              <OwnerInquiryCard inquiry={inquiry} />
             </li>
           ))}
         </ul>
