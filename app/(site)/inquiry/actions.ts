@@ -2,19 +2,17 @@
 
 import { revalidatePath } from "next/cache";
 import { deliverRenterMessageNotice } from "@/lib/email";
+import {
+  RENTER_BODY,
+  RENTER_EXPIRED,
+  RENTER_LIMIT,
+  RENTER_SEND,
+  type RenterReplyState,
+} from "@/lib/renter-reply";
 import { hashRenterToken } from "@/lib/renter-token";
 import { createServiceClient } from "@/lib/supabase/service";
 
-export type RenterReplyState = {
-  ok: boolean;
-  success?: boolean;
-  formError?: string;
-};
-
-export const RENTER_EXPIRED = "This link has expired. Open the newest email from the owner.";
-export const RENTER_BODY = "Write a reply between 1 and 8000 characters.";
-export const RENTER_LIMIT = "Please wait before sending another message.";
-export const RENTER_SEND = "We couldn't send this. Please try again.";
+export type { RenterReplyState };
 
 const HOUR_MS = 60 * 60 * 1000;
 const HOUR_LIMIT = 20;

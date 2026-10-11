@@ -1,6 +1,7 @@
 "use client";
 
-import { renterReply, type RenterReplyState } from "@/app/(site)/inquiry/actions";
+import { renterReply } from "@/app/(site)/inquiry/actions";
+import type { RenterReplyState } from "@/lib/renter-reply";
 import { useActionState, useState } from "react";
 
 const empty: RenterReplyState = { ok: false };
