@@ -12,9 +12,9 @@ export function listingFeePerYear(): string {
   return `${listingFeeAmount()}/year`;
 }
 
-/** "List my property — $199" */
+/** "List my property — $199/year" */
 export function listMyPropertyLabel(): string {
-  return `List my property — ${listingFeeAmount()}`;
+  return `List my property — ${listingFeePerYear()}`;
 }
 
 /** "$199/yr paid" */

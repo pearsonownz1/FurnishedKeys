@@ -5,7 +5,7 @@ import { Suspense } from "react";
 import { AssessmentForm } from "@/components/owners/assessment-form";
 import { sanitizeSource } from "@/lib/leads";
 import { ownersKicker, ownersRegionName } from "@/lib/owners-copy";
-import { listMyPropertyLabel, listingFeeAmount } from "@/lib/pricing";
+import { listMyPropertyLabel, listingFeeAmount, listingFeeCadenceLabel } from "@/lib/pricing";
 
 export const metadata = {
   title: "List your property",
@@ -116,7 +116,7 @@ async function OwnersLanding({ searchParams }: { searchParams: Promise<Search> }
               Your listing, your renters
             </h3>
             <p className="mt-6 font-serif text-[56px] leading-none text-pine">{listingFeeAmount()}</p>
-            <p className="mt-1 text-sm text-muted">per listing</p>
+            <p className="mt-1 text-sm text-muted">{listingFeeCadenceLabel()}</p>
             <ul className="mt-8">
               {selfPoints.map((point) => (
                 <li key={point} className="flex items-start gap-3 border-t border-line py-3 text-[15px] leading-relaxed">

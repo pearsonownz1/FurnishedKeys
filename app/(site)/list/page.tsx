@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { listingFeeAmount, listingFeePerYear } from "@/lib/pricing";
+import { listingFeeAmount, listingFeeCadenceLabel, listingFeePerYear } from "@/lib/pricing";
 
 export const metadata = {
   title: "List your property",
@@ -20,8 +20,8 @@ export default function ListPage() {
       <div className="mt-10 max-w-md border border-line bg-surface px-5 py-5">
         <p className="font-semibold">List it yourself</p>
         <p className="mt-1 text-sm text-muted">
-          {listingFeeAmount()} per listing, per year ({listingFeePerYear()}). Billed
-          yearly and renews automatically. Checkout is not open yet.
+          {listingFeeAmount()} {listingFeeCadenceLabel()} ({listingFeePerYear()}). Billed
+          yearly and renews automatically.
         </p>
       </div>
       <p className="mt-8 text-[15px] leading-relaxed text-ink">

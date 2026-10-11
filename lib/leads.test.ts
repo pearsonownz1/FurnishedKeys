@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { toOwnerLeadInsert, validateOwnerLead, type OwnerLeadInput } from "./leads";
-import { listMyPropertyLabel } from "./pricing";
+import { listMyPropertyLabel, listingFeeCadenceLabel } from "./pricing";
 
 const base: OwnerLeadInput = {
   name: "QA test – delete",
@@ -72,7 +72,8 @@ describe("owner lead insert", () => {
     expect(action).toContain("logInsertError");
     expect(action).not.toMatch(/\.insert\([\s\S]*?\)\s*\.select\(/);
     expect(action).not.toMatch(/\.single\(/);
-    expect(listMyPropertyLabel()).toBe("List my property — $199");
+    expect(listMyPropertyLabel()).toBe("List my property — $199/year");
+    expect(listingFeeCadenceLabel()).toBe("/year per listing");
   });
 
   it("accepts a written availability note", () => {
