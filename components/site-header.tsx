@@ -11,7 +11,7 @@ export function SiteHeader({ tone = "solid" }: { tone?: "overlay" | "solid" }) {
   const overlay = tone === "overlay";
   const listClass = overlay
     ? "rounded-[2px] border border-white/70 px-3.5 py-2 text-sm"
-    : "rounded-[2px] border border-pine px-3.5 py-2 text-sm text-pine";
+    : "rounded-[2px] border border-ink px-3 py-2 text-sm text-ink";
   const menuClass = overlay
     ? "cursor-pointer rounded-[2px] border border-white/70 px-3 py-2 text-sm"
     : "cursor-pointer rounded-[2px] border border-line bg-surface px-3 py-2 text-sm";
@@ -21,10 +21,16 @@ export function SiteHeader({ tone = "solid" }: { tone?: "overlay" | "solid" }) {
       className={
         overlay
           ? "absolute inset-x-0 top-0 z-20 text-white"
-          : "border-b border-line bg-bg text-ink"
+          : "border-b border-line bg-surface text-ink"
       }
     >
-      <div className="shell flex h-[72px] items-center justify-between gap-3">
+      <div
+        className={
+          overlay
+            ? "shell flex h-[72px] items-center justify-between gap-3"
+            : "flex h-16 items-center justify-between gap-3 px-5 md:px-8"
+        }
+      >
         <Link
           href="/"
           className="font-serif text-[22px] tracking-[-0.3px] sm:text-[26px]"
@@ -32,7 +38,10 @@ export function SiteHeader({ tone = "solid" }: { tone?: "overlay" | "solid" }) {
           Furnished <span className="italic">Keys</span>
         </Link>
 
-        <nav aria-label="Primary" className="hidden items-center gap-8 text-sm lg:flex">
+        <nav
+          aria-label="Primary"
+          className={`hidden items-center gap-7 text-sm lg:flex ${overlay ? "" : "text-muted"}`}
+        >
           {links.map((link) => (
             <Link key={link.href} href={link.href} className="hover:opacity-80">
               {link.label}

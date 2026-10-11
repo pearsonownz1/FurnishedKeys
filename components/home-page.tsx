@@ -1,13 +1,19 @@
 import Image from "next/image";
 import Link from "next/link";
+import { connection } from "next/server";
 import { Suspense } from "react";
 import { ListingCard } from "@/components/listing-card";
 import { SearchBar, SearchBarSkeleton } from "@/components/search-bar";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { brand } from "@/lib/brand";
-import { getPublicListings } from "@/lib/listings";
+import {
+  getPublicListings,
+  primaryPhoto,
+  sortByRecentConfirmation,
+} from "@/lib/listings";
 import { launchKicker, primaryLocation } from "@/lib/locations";
+import { signedPhotoUrls } from "@/lib/photos";
 import { formatCents } from "@/lib/money";
 import { SELF_LIST_PRICE_CENTS } from "@/lib/pricing";
 
@@ -31,7 +37,6 @@ const steps = [
 
 export function HomePage() {
   const market = primaryLocation();
-  const listings = getPublicListings();
 
   return (
     <>
@@ -120,11 +125,9 @@ export function HomePage() {
               See all on the map
             </Link>
           </div>
-          <div className="grid gap-7 lg:grid-cols-3">
-            {listings.map((listing) => (
-              <ListingCard key={listing.id} listing={listing} />
-            ))}
-          </div>
+          <Suspense fallback={<p className="text-muted">Loading homes…</p>}>
+            <AvailableHomes />
+          </Suspense>
         </section>
 
         <section className="shell pt-20 lg:pt-28">
@@ -210,5 +213,26 @@ export function HomePage() {
       </main>
       <SiteFooter />
     </>
+  );
+}
+
+async function AvailableHomes() {
+  await connection();
+  const listings = sortByRecentConfirmation(await getPublicListings()).slice(0, 3);
+  const photos = await signedPhotoUrls(listings);
+
+  return (
+    <div className="grid gap-7 lg:grid-cols-3">
+      {listings.map((listing) => {
+        const photo = primaryPhoto(listing);
+        return (
+          <ListingCard
+            key={listing.id}
+            listing={listing}
+            imageUrl={photo ? (photos.get(photo.storage_path) ?? null) : null}
+          />
+        );
+      })}
+    </div>
   );
 }
