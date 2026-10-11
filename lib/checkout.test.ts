@@ -50,6 +50,10 @@ describe("checkout response", () => {
     expect(source).toContain("Renew automatically each year");
     expect(source).toContain("Order summary");
     expect(source).toContain("paid_through");
+    expect(source).toContain("console.error");
+    expect(source).toContain("/sign-in?next=");
+    expect(source).toContain("checkoutError");
+    expect(source).not.toContain("We couldn't start checkout");
     expect(source).toContain("clientSecret && publishableKey");
     expect(source).toContain("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY");
     expect(embed).toContain("loadStripe");

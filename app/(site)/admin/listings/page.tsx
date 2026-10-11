@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { connection } from "next/server";
+import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { loadReviewQueue } from "@/lib/admin-queue";
 import { queueFeeLabel, statusLabel } from "@/lib/owner-board";
@@ -27,13 +28,9 @@ async function Queue() {
       <h1 className="mt-3 font-serif text-[clamp(2.75rem,5vw,4.5rem)] leading-none font-normal tracking-[-1px]">
         Review queue
       </h1>
+      {!queue.signedIn ? redirect("/sign-in?next=%2Fadmin%2Flistings") : null}
       {!queue.admin ? (
-        <p className="mt-6 text-sm text-muted">
-          <Link href="/sign-in" className="font-semibold text-pine">
-            Sign in
-          </Link>{" "}
-          with an admin account to review listings.
-        </p>
+        <p className="mt-6 text-sm">Not authorized</p>
       ) : queue.rows.length === 0 ? (
         <p className="mt-8 text-sm text-muted">Nothing is waiting for review.</p>
       ) : (

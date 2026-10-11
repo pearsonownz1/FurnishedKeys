@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { StripeEmbed } from "@/components/listing/stripe-embed";
@@ -19,11 +20,13 @@ export function CheckoutPanel({
   const [autoRenew, setAutoRenew] = useState(true);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [needsSignIn, setNeedsSignIn] = useState(false);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
 
   async function pay(renew: boolean) {
     setPending(true);
     setError(null);
+    setNeedsSignIn(false);
     const response = await fetch(`/api/listings/${listingId}/checkout`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -32,15 +35,18 @@ export function CheckoutPanel({
     const body: unknown = await response.json().catch(() => null);
     const parsed = parseCheckoutPost(body);
     if (!response.ok || !parsed) {
+      console.error("checkout", response.status, body);
       setClientSecret(null);
-      setError("We couldn't start checkout. Please try again.");
+      setNeedsSignIn(response.status === 401);
+      setError(checkoutError(body, response.status));
       setPending(false);
       return;
     }
     if ("client_secret" in parsed) {
       if (!publishableKey) {
+        console.error("checkout", response.status, "client_secret without publishable key");
         setClientSecret(null);
-        setError("We couldn't start checkout. Please try again.");
+        setError("Checkout returned a payment session, but the publishable key is not set.");
         setPending(false);
         return;
       }
@@ -96,6 +102,14 @@ export function CheckoutPanel({
         {error ? (
           <p className="mt-4 text-sm text-warn" role="alert">
             {error}{" "}
+            {needsSignIn ? (
+              <Link
+                href={`/sign-in?next=${encodeURIComponent(`/owners/listings/${listingId}/checkout`)}`}
+                className="font-semibold text-pine"
+              >
+                Sign in
+              </Link>
+            ) : null}{" "}
             <button type="button" className="font-semibold text-pine" onClick={() => void pay(autoRenew)}>
               Try again
             </button>
@@ -110,4 +124,12 @@ export function CheckoutPanel({
       </aside>
     </div>
   );
+}
+
+function checkoutError(body: unknown, status: number): string {
+  if (body && typeof body === "object" && "error" in body) {
+    const message = (body as { error?: unknown }).error;
+    if (typeof message === "string" && message.trim()) return message;
+  }
+  return `Checkout failed (${status}).`;
 }

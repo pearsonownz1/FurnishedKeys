@@ -52,11 +52,17 @@ export async function loadReviewQueue(): Promise<{ signedIn: boolean; admin: boo
   return { signedIn: true, admin: true, rows };
 }
 
-export async function loadReviewDetail(id: string): Promise<ReviewModel | null> {
+export type ReviewDetailResult =
+  | { status: "signed-out" }
+  | { status: "forbidden" }
+  | { status: "missing" }
+  | { status: "ready"; listing: ReviewModel };
+
+export async function loadReviewDetail(id: string): Promise<ReviewDetailResult> {
   const { supabase, user } = await sessionUser();
-  if (!user) return null;
+  if (!user) return { status: "signed-out" };
   const role = await loadRole(supabase, user.id);
-  if (role !== "admin") return null;
+  if (role !== "admin") return { status: "forbidden" };
 
   const { data, error } = await supabase
     .from("listings")
@@ -65,7 +71,7 @@ export async function loadReviewDetail(id: string): Promise<ReviewModel | null> 
     .maybeSingle();
   if (error) throw new Error(error.message);
   const row = data as unknown as OwnerRow | null;
-  if (!row) return null;
+  if (!row) return { status: "missing" };
 
   const [fees, address] = await Promise.all([
     supabase.from("listing_fees").select("*").eq("listing_id", id),
@@ -74,21 +80,24 @@ export async function loadReviewDetail(id: string): Promise<ReviewModel | null> 
   if (fees.error) throw new Error(fees.error.message);
 
   return {
-    id: row.id,
-    title: row.title ?? "Untitled listing",
-    description: row.description,
-    area: locationById(row.location_id)?.name ?? "",
-    status: boardStatus(row.status),
-    feeStatus: row.listing_fee_status,
-    adminNote: row.admin_note,
-    addressPrivate: address.data ?? null,
-    monthlyRentCents: row.monthly_rent_cents,
-    fees: ((fees.data ?? []) as ListingFee[]).map((fee) => ({
-      id: fee.id,
-      label: fee.label,
-      amountCents: fee.amount_cents,
-    })),
-    renewalCanceled: row.renewal_canceled,
-    rawStatus: row.status,
+    status: "ready",
+    listing: {
+      id: row.id,
+      title: row.title ?? "Untitled listing",
+      description: row.description,
+      area: locationById(row.location_id)?.name ?? "",
+      status: boardStatus(row.status),
+      feeStatus: row.listing_fee_status,
+      adminNote: row.admin_note,
+      addressPrivate: address.data ?? null,
+      monthlyRentCents: row.monthly_rent_cents,
+      fees: ((fees.data ?? []) as ListingFee[]).map((fee) => ({
+        id: fee.id,
+        label: fee.label,
+        amountCents: fee.amount_cents,
+      })),
+      renewalCanceled: row.renewal_canceled,
+      rawStatus: row.status,
+    },
   };
 }

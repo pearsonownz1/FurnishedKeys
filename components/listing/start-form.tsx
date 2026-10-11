@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { PropertyType } from "@/lib/db/types";
@@ -26,6 +27,7 @@ export function StartForm({
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [needsSignIn, setNeedsSignIn] = useState(false);
   const [pending, setPending] = useState(false);
 
   async function start() {
@@ -35,6 +37,7 @@ export function StartForm({
     }
     setPending(true);
     setError(null);
+    setNeedsSignIn(false);
     const response = await fetch("/api/owners/start", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -53,6 +56,7 @@ export function StartForm({
     } | null;
     setPending(false);
     if (!response.ok || !body?.listing_id) {
+      setNeedsSignIn(response.status === 401 && body?.error === "Sign in required");
       setError(body?.error ?? "We couldn't start this listing. Please try again.");
       return;
     }
@@ -120,7 +124,12 @@ export function StartForm({
             </div>
             {error ? (
               <p className="mt-4 text-sm text-warn" role="alert">
-                {error}
+                {error}{" "}
+                {needsSignIn ? (
+                  <Link href="/sign-in?next=%2Fowners%2Fstart" className="font-semibold text-pine">
+                    Sign in
+                  </Link>
+                ) : null}
               </p>
             ) : null}
             <div className="mt-8 flex gap-4">
