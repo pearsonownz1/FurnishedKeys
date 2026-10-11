@@ -4,7 +4,7 @@ Marketplace for furnished monthly and extended-stay rentals — ADUs, apartments
 
 **Furnished homes. Flexible stays.** Find a furnished place for your next chapter—or let us help manage yours.
 
-Renters search and send an inquiry. Owners list a property for $199 or ask for a management consultation. This repository is the front end. Auth, payments, messaging, and booking are not built yet.
+Renters search and send an inquiry. Owners list a property for $199 per year or ask for a management consultation. Listing submission and the yearly fee live under `app/api`. Booking is not built yet.
 
 ## Stack
 
@@ -29,6 +29,9 @@ Copy `.env.example` for local work. Production values are set on the Vercel proj
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY` (server only)
+- `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, optional `STRIPE_LISTING_PRICE_ID`
+- `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (Embedded Checkout)
 
 `lib/supabase/client.ts` is the browser client. `lib/supabase/server.ts` is the server client (cookie adapter, no session middleware yet).
 
@@ -53,4 +56,4 @@ Do not add files at those paths from the front end. Listing fixtures in `lib/lis
 
 ## Not in this version
 
-Accounts, the $199 checkout, inquiry threads, and booking.
+Inquiry threads and booking. The yearly listing fee is `POST /api/listings/[id]/checkout` (Embedded Checkout).

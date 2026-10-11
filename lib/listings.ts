@@ -19,7 +19,21 @@ import { createPublicClient } from "@/lib/supabase/public";
  * Public reads never include `address_private`.
  */
 
-export type PublicListing = ListingPublic & {
+type CatalogText = "title" | "slug";
+type CatalogNumber =
+  | "bedrooms"
+  | "bathrooms"
+  | "max_occupants"
+  | "monthly_rent_cents";
+
+/** Approved catalog row after null stub fields are coerced. Public RLS already hides unpaid listings. */
+export type PublicListing = Omit<ListingPublic, CatalogText | CatalogNumber> & {
+  title: string;
+  slug: string;
+  bedrooms: number;
+  bathrooms: number;
+  max_occupants: number;
+  monthly_rent_cents: number;
   location: Location;
   fees: ListingFee[];
   photos: ListingPhoto[];
@@ -40,9 +54,13 @@ function asNumber(value: number | string | null | undefined): number | null {
   return Number.isFinite(number) ? number : null;
 }
 
-function normalizeListing(row: ListingPublic): ListingPublic {
+function normalizeListing(
+  row: ListingPublic,
+): Omit<PublicListing, "location" | "fees" | "photos" | "availability_windows"> {
   return {
     ...row,
+    title: row.title ?? "",
+    slug: row.slug ?? "",
     bedrooms: asNumber(row.bedrooms) ?? 0,
     bathrooms: asNumber(row.bathrooms) ?? 0,
     max_occupants: asNumber(row.max_occupants) ?? 1,
