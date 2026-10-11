@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { StripeEmbed } from "@/components/listing/stripe-embed";
-import { checkoutNotConfigured, parseCheckoutPost } from "@/lib/checkout";
+import { parseCheckoutPost } from "@/lib/checkout";
 import { listingFeeAmount, listingFeePerYear } from "@/lib/pricing";
 
 const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? "";
@@ -20,35 +20,30 @@ export function CheckoutPanel({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
-  const [paymentsPendingSetup, setPaymentsPendingSetup] = useState(!publishableKey);
 
   async function pay(renew: boolean) {
-    if (!publishableKey) {
-      setPaymentsPendingSetup(true);
-      return;
-    }
     setPending(true);
     setError(null);
-    setPaymentsPendingSetup(false);
-    setClientSecret(null);
     const response = await fetch(`/api/listings/${listingId}/checkout`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ auto_renew: renew }),
     });
     const body: unknown = await response.json().catch(() => null);
-    if (checkoutNotConfigured(response.status, body)) {
-      setPaymentsPendingSetup(true);
-      setPending(false);
-      return;
-    }
     const parsed = parseCheckoutPost(body);
     if (!response.ok || !parsed) {
+      setClientSecret(null);
       setError("We couldn't start checkout. Please try again.");
       setPending(false);
       return;
     }
     if ("client_secret" in parsed) {
+      if (!publishableKey) {
+        setClientSecret(null);
+        setError("We couldn't start checkout. Please try again.");
+        setPending(false);
+        return;
+      }
       setClientSecret(parsed.client_secret);
       setPending(false);
       return;
@@ -57,6 +52,8 @@ export function CheckoutPanel({
       `/owners/listings/${listingId}/setup?paid_through=${encodeURIComponent(parsed.paid_through)}`,
     );
   }
+
+  const showCard = Boolean(clientSecret && publishableKey);
 
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
@@ -77,14 +74,12 @@ export function CheckoutPanel({
             onChange={(event) => {
               const renew = event.target.checked;
               setAutoRenew(renew);
-              if (clientSecret) void pay(renew);
+              if (showCard) void pay(renew);
             }}
           />
           <span>Renew automatically each year. You can turn this off later.</span>
         </label>
-        {paymentsPendingSetup ? (
-          <p className="mt-6 text-sm text-muted">Payments are being set up</p>
-        ) : clientSecret ? (
+        {showCard && clientSecret ? (
           <div className="mt-6">
             <StripeEmbed clientSecret={clientSecret} publishableKey={publishableKey} />
           </div>

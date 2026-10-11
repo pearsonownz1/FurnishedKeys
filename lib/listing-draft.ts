@@ -295,6 +295,16 @@ export function missingForStep(fields: string[], step: ListingStepId): string[] 
     .map((field) => missingMessage[field] ?? "This step still needs a few details.");
 }
 
+export function missingLinks(
+  fields: string[],
+): { field: string; step: ListingStepId; message: string }[] {
+  return fields.flatMap((field) => {
+    const step = missingStep[field];
+    if (!step) return [];
+    return [{ field, step, message: missingMessage[field] ?? "This step still needs a few details." }];
+  });
+}
+
 export function missingCount(fields: string[], step: ListingStepId): number {
   return fields.filter((field) => missingStep[field] === step).length;
 }

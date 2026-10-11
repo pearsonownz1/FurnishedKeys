@@ -7,6 +7,7 @@ import {
   firstMissingStep,
   listingSteps,
   missingForStep,
+  missingLinks,
   parseBeds,
   toListingPatch,
 } from "./listing-draft";
@@ -92,6 +93,12 @@ describe("listing draft", () => {
   it("maps submit gaps onto the matching step", () => {
     const missing = ["cover", "title", "bedroom", "min_stay"];
     expect(firstMissingStep(missing)).toBe("basics");
+    expect(missingLinks(missing).map((item) => [item.field, item.step])).toEqual([
+      ["cover", "photos"],
+      ["title", "basics"],
+      ["bedroom", "rooms"],
+      ["min_stay", "availability"],
+    ]);
     expect(missingForStep(missing, "photos")).toEqual(["Pick a cover photo."]);
     expect(missingForStep(missing, "rooms")).toEqual(["Add a bedroom."]);
     expect(missingForStep(missing, "availability")).toEqual(["Add a minimum stay."]);

@@ -18,7 +18,7 @@ import {
   firstMissingStep,
   listingSteps,
   missingCount,
-  missingForStep,
+  missingLinks,
   toListingPatch,
   type BedroomDraft,
   type DraftPhoto,
@@ -254,7 +254,7 @@ export function ListingSetup({
   }
 
   const atPhotoCap = draft.photos.length >= MAX_LISTING_PHOTOS;
-  const stepErrors = missingForStep(missing, step);
+  const gaps = missingLinks(missing);
 
   return (
     <div className="shell py-8 lg:py-12">
@@ -310,10 +310,14 @@ export function ListingSetup({
               ) : null}
             </p>
           ) : null}
-          {stepErrors.length > 0 ? (
+          {gaps.length > 0 ? (
             <ul className="mb-4 space-y-1 text-sm text-warn" role="alert">
-              {stepErrors.map((message) => (
-                <li key={message}>{message}</li>
+              {gaps.map((gap) => (
+                <li key={gap.field}>
+                  <button type="button" className="underline" onClick={() => go(gap.step)}>
+                    {gap.message}
+                  </button>
+                </li>
               ))}
             </ul>
           ) : null}

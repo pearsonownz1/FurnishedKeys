@@ -12,7 +12,11 @@ export function StripeEmbed({
   clientSecret: string;
   publishableKey: string;
 }) {
-  const stripePromise = useMemo(() => loadStripe(publishableKey), [publishableKey]);
+  const stripePromise = useMemo(
+    () => (publishableKey ? loadStripe(publishableKey) : null),
+    [publishableKey],
+  );
+  if (!stripePromise) return null;
 
   return (
     <div key={clientSecret}>

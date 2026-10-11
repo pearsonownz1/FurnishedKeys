@@ -1,11 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import {
-  checkoutNotConfigured,
-  paidThroughMonthYear,
-  parseCheckoutPost,
-  parseCheckoutStatus,
-} from "./checkout";
+import { paidThroughMonthYear, parseCheckoutPost, parseCheckoutStatus } from "./checkout";
 
 describe("checkout response", () => {
   it("accepts a waived placeholder and a client secret as different branches", () => {
@@ -46,25 +41,25 @@ describe("checkout response", () => {
     expect(paidThroughMonthYear("2027-10-11T00:00:00.000Z")).toBe("Paid through Oct 2027");
   });
 
-  it("treats a missing publishable key or a not-configured checkout as calm", () => {
-    expect(checkoutNotConfigured(503, { error: "Payments are not set up yet" })).toBe(true);
-    expect(checkoutNotConfigured(503, null)).toBe(true);
-    expect(checkoutNotConfigured(400, { error: "Server is not configured" })).toBe(true);
-    expect(checkoutNotConfigured(402, { error: "Payment required" })).toBe(false);
-
+  it("keeps Process payment on our page and mounts Stripe only with a secret and key", () => {
     const source = readFileSync("components/listing/checkout-panel.tsx", "utf8");
+    const embed = readFileSync("components/listing/stripe-embed.tsx", "utf8");
     const route = readFileSync("app/api/listings/[id]/checkout/route.ts", "utf8");
-    expect(source).toContain("checkoutNotConfigured");
     expect(source).toContain("parseCheckoutPost");
-    expect(source).toContain("Payments are being set up");
-    expect(source).toContain("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY");
-    expect(source).toContain("StripeEmbed");
+    expect(source).toContain("Process payment");
     expect(source).toContain("Renew automatically each year");
+    expect(source).toContain("Order summary");
+    expect(source).toContain("paid_through");
+    expect(source).toContain("clientSecret && publishableKey");
+    expect(source).toContain("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY");
+    expect(embed).toContain("loadStripe");
+    expect(source).not.toContain("loadStripe");
+    expect(source).not.toContain("Payments are being set up");
+    expect(source).not.toContain("Payments coming soon");
     expect(source).not.toContain("appearance");
     expect(source).not.toContain("branding_settings");
     expect(route).not.toContain("branding_settings");
     expect(route).not.toContain("appearance");
-    expect(source).not.toContain("Payments coming soon");
     expect(source).not.toMatch(/refund/i);
     expect(source).not.toContain("STRIPE_SECRET_KEY");
   });
