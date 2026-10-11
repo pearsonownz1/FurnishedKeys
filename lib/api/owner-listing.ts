@@ -39,18 +39,24 @@ export async function loadRole(supabase: AppClient, userId: string): Promise<Use
   return data?.role ?? null;
 }
 
-export async function countChildren(supabase: AppClient, listingId: string) {
-  const [photos, windows] = await Promise.all([
+export async function loadSetupState(supabase: AppClient, listingId: string) {
+  const [photos, bedrooms] = await Promise.all([
     supabase
       .from("listing_photos")
-      .select("id", { count: "exact", head: true })
+      .select("id, is_cover, sort")
       .eq("listing_id", listingId),
     supabase
-      .from("availability_windows")
+      .from("listing_bedrooms")
       .select("id", { count: "exact", head: true })
       .eq("listing_id", listingId),
   ]);
   if (photos.error) throw new Error(photos.error.message);
-  if (windows.error) throw new Error(windows.error.message);
-  return { photoCount: photos.count ?? 0, availabilityCount: windows.count ?? 0 };
+  if (bedrooms.error) throw new Error(bedrooms.error.message);
+  const rows = photos.data ?? [];
+  return {
+    photos: rows,
+    photoCount: rows.length,
+    hasCover: rows.some((photo) => photo.is_cover),
+    bedroomCount: bedrooms.count ?? 0,
+  };
 }

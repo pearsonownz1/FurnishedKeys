@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { propertyTypes } from "@/lib/db/types";
+import { amenityKeys } from "./amenities";
 import { SOURCE_PATTERN } from "./access";
+import { goodForKeys } from "./good-for";
+import { MAX_LISTING_PHOTOS } from "./setup";
 
 const propertyTypeSchema = z.enum(propertyTypes);
 
@@ -35,6 +38,30 @@ const availabilitySchema = z
     message: "available_to must be on or after available_from",
   });
 
+const bedroomSchema = z.object({
+  label: z.string().trim().min(1).max(80).optional(),
+  beds: z.string().trim().min(1).max(80),
+});
+
+const blockedDateSchema = z
+  .object({
+    start_date: dateSchema,
+    end_date: dateSchema,
+    note: z.string().trim().min(1).max(500).nullable().optional(),
+  })
+  .refine((span) => span.end_date >= span.start_date, {
+    message: "end_date must be on or after start_date",
+  });
+
+function uniqueKeys(keys: string[], context: z.RefinementCtx, label: string) {
+  if (new Set(keys).size !== keys.length) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `${label} must be unique`,
+    });
+  }
+}
+
 export const patchListingSchema = z
   .object({
     location_id: z.string().uuid().optional(),
@@ -48,7 +75,6 @@ export const patchListingSchema = z
       .nullable()
       .optional(),
     description: z.string().trim().min(1).max(8000).nullable().optional(),
-    bedrooms: z.number().int().min(0).max(30).nullable().optional(),
     bathrooms: z.number().min(0).max(30).nullable().optional(),
     max_occupants: z.number().int().min(1).max(50).nullable().optional(),
     pets_allowed: z.boolean().optional(),
@@ -56,13 +82,33 @@ export const patchListingSchema = z
     monthly_rent_cents: z.number().int().min(0).max(100_000_000).nullable().optional(),
     min_stay_months: z.number().int().min(1).max(120).optional(),
     max_stay_months: z.number().int().min(1).max(120).nullable().optional(),
-    amenities: z.array(z.string().trim().min(1).max(80)).max(40).optional(),
+    amenities: z
+      .array(z.enum(amenityKeys))
+      .max(amenityKeys.length)
+      .superRefine((keys, context) => uniqueKeys(keys, context, "Amenities"))
+      .optional(),
+    good_for: z
+      .array(z.enum(goodForKeys))
+      .max(goodForKeys.length)
+      .superRefine((keys, context) => uniqueKeys(keys, context, "Good for"))
+      .optional(),
     house_rules: z.string().trim().min(1).max(8000).nullable().optional(),
+    square_feet: z.number().int().positive().max(100_000).nullable().optional(),
+    space_description: z.string().trim().min(1).max(8000).nullable().optional(),
+    smoking_allowed: z.boolean().optional(),
+    bedrooms: z.array(bedroomSchema).max(30).optional(),
     approx_lat: z.number().min(-90).max(90).nullable().optional(),
     approx_lng: z.number().min(-180).max(180).nullable().optional(),
     address_private: z.string().trim().min(1).max(500).nullable().optional(),
     management: z.enum(["self_managed", "fk_managed"]).optional(),
-    availability: z.array(availabilitySchema).max(12).optional(),
+    availability: z.array(availabilitySchema).max(24).optional(),
+  })
+  .strict();
+
+export const calendarSchema = z
+  .object({
+    availability: z.array(availabilitySchema).max(24),
+    blocked_dates: z.array(blockedDateSchema).max(366),
   })
   .strict();
 
@@ -70,7 +116,7 @@ export const photoUploadSchema = z.object({
   files: z
     .array(z.object({ name: z.string().trim().min(1).max(200) }))
     .min(1)
-    .max(12),
+    .max(MAX_LISTING_PHOTOS),
 });
 
 export const checkoutSchema = z.object({

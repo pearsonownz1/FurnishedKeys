@@ -1,5 +1,5 @@
 import { accessDenied, invalidBody, jsonError, readJson } from "@/lib/api/http";
-import { countChildren, loadOwnerListing, loadRole, sessionUser } from "@/lib/api/owner-listing";
+import { loadOwnerListing, loadRole, loadSetupState, sessionUser } from "@/lib/api/owner-listing";
 import { feeCoversListing, missingSubmitFields, requireAdmin } from "@/lib/listings/access";
 import { reviewSchema } from "@/lib/listings/schemas";
 import { periodEndFromSubscription, recordCancellation } from "@/lib/stripe/apply-fee";
@@ -32,13 +32,16 @@ export async function POST(request: Request, context: Context) {
   const note = parsed.data.note ?? null;
 
   if (parsed.data.action === "approve") {
-    const counts = await countChildren(supabase, id);
+    const setup = await loadSetupState(supabase, id);
     const missing = missingSubmitFields({
       title: listing.title,
       description: listing.description,
       monthly_rent_cents: listing.monthly_rent_cents,
-      photoCount: counts.photoCount,
-      availabilityCount: counts.availabilityCount,
+      min_stay_months: listing.min_stay_months,
+      bedroomCount: setup.bedroomCount,
+      bathrooms: listing.bathrooms,
+      photoCount: setup.photoCount,
+      hasCover: setup.hasCover,
     });
     if (missing.length > 0) return jsonError(422, "Listing is incomplete", { missing });
     if (!feeCoversListing(listing, new Date())) {

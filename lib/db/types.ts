@@ -2,6 +2,8 @@
  * Hand-written types for the FurnishedKeys schema.
  * Source of truth: supabase/migrations/. The listing fee columns and
  * listing_payments are added in 20261011053000_listing_subscription.sql.
+ * Setup columns, listing_bedrooms, listing_blocked_dates, and
+ * public_listing_landlord are added in 20261011070000_listing_setup_fields.sql.
  *
  * `listings.address_private` is not selectable by anon or authenticated.
  * Use the `listings_public` view, or `listingPublicColumns`, for catalog reads.
@@ -107,7 +109,15 @@ export type Listing = {
   min_stay_months: number;
   max_stay_months: number | null;
   amenities: string[];
+  /** Who the home suits. Keys from lib/listings/good-for.ts. */
+  good_for: string[];
   house_rules: string | null;
+  square_feet: number | null;
+  /** The space. Longer than the short description. */
+  space_description: string | null;
+  smoking_allowed: boolean;
+  /** When availability windows or blocked dates last changed. */
+  calendar_updated_at: string | null;
   approx_lat: number | null;
   approx_lng: number | null;
   address_private: string | null;
@@ -179,6 +189,29 @@ export type ListingPhoto = {
   storage_path: string;
   caption: string | null;
   sort: number;
+  is_cover: boolean;
+};
+
+export type ListingBedroom = {
+  id: string;
+  listing_id: string;
+  sort: number;
+  label: string;
+  beds: string;
+};
+
+export type ListingBlockedDate = {
+  id: string;
+  listing_id: string;
+  start_date: string;
+  end_date: string;
+  note: string | null;
+};
+
+export type PublicLandlord = {
+  first_name: string | null;
+  last_initial: string | null;
+  member_since: string;
 };
 
 export type AvailabilityWindow = {
@@ -256,7 +289,12 @@ export type ListingInsert = WithOptional<
   | "min_stay_months"
   | "max_stay_months"
   | "amenities"
+  | "good_for"
   | "house_rules"
+  | "square_feet"
+  | "space_description"
+  | "smoking_allowed"
+  | "calendar_updated_at"
   | "approx_lat"
   | "approx_lng"
   | "address_private"
@@ -288,8 +326,10 @@ export type ListingPaymentInsert = WithOptional<
 export type ListingFeeInsert = WithOptional<ListingFee, "id" | "refundable">;
 export type ListingPhotoInsert = WithOptional<
   ListingPhoto,
-  "id" | "caption" | "sort"
+  "id" | "caption" | "sort" | "is_cover"
 >;
+export type ListingBedroomInsert = WithOptional<ListingBedroom, "id" | "sort" | "label">;
+export type ListingBlockedDateInsert = WithOptional<ListingBlockedDate, "id" | "note">;
 export type AvailabilityWindowInsert = WithOptional<
   AvailabilityWindow,
   "id" | "available_to" | "last_confirmed_at" | "confirmed_by"
@@ -334,6 +374,8 @@ export type ListingUpdate = Partial<Omit<Listing, "id" | "created_at">>;
 export type ListingPaymentUpdate = Partial<Omit<ListingPayment, "id" | "created_at">>;
 export type ListingFeeUpdate = Partial<Omit<ListingFee, "id">>;
 export type ListingPhotoUpdate = Partial<Omit<ListingPhoto, "id">>;
+export type ListingBedroomUpdate = Partial<Omit<ListingBedroom, "id">>;
+export type ListingBlockedDateUpdate = Partial<Omit<ListingBlockedDate, "id">>;
 export type AvailabilityWindowUpdate = Partial<Omit<AvailabilityWindow, "id">>;
 export type InquiryUpdate = Partial<Omit<Inquiry, "id" | "created_at">>;
 export type MessageUpdate = Partial<Omit<Message, "id" | "created_at">>;
@@ -364,7 +406,12 @@ export const listingPublicColumns = listingColumns([
   "min_stay_months",
   "max_stay_months",
   "amenities",
+  "good_for",
   "house_rules",
+  "square_feet",
+  "space_description",
+  "smoking_allowed",
+  "calendar_updated_at",
   "approx_lat",
   "approx_lng",
   "management",
@@ -416,6 +463,12 @@ export type Database = {
       listings: Table<Listing, ListingInsert, ListingUpdate>;
       listing_fees: Table<ListingFee, ListingFeeInsert, ListingFeeUpdate>;
       listing_photos: Table<ListingPhoto, ListingPhotoInsert, ListingPhotoUpdate>;
+      listing_bedrooms: Table<ListingBedroom, ListingBedroomInsert, ListingBedroomUpdate>;
+      listing_blocked_dates: Table<
+        ListingBlockedDate,
+        ListingBlockedDateInsert,
+        ListingBlockedDateUpdate
+      >;
       availability_windows: Table<
         AvailabilityWindow,
         AvailabilityWindowInsert,
@@ -440,6 +493,10 @@ export type Database = {
       listing_address: {
         Args: { target_listing: string };
         Returns: string | null;
+      };
+      public_listing_landlord: {
+        Args: { listing_id: string };
+        Returns: PublicLandlord[];
       };
       apply_listing_fee_event: {
         Args: {

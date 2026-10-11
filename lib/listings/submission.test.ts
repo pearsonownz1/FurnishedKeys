@@ -82,8 +82,11 @@ describe("submit completeness and coverage", () => {
     title: "Northwest ADU",
     description: "Furnished for a few months.",
     monthly_rent_cents: 199_000,
+    min_stay_months: 1,
+    bedroomCount: 1,
+    bathrooms: 1,
     photoCount: 1,
-    availabilityCount: 1,
+    hasCover: true,
   };
 
   it("lists every missing field", () => {
@@ -92,10 +95,22 @@ describe("submit completeness and coverage", () => {
         title: "  ",
         description: null,
         monthly_rent_cents: 0,
+        min_stay_months: 0,
+        bedroomCount: 0,
+        bathrooms: null,
         photoCount: 0,
-        availabilityCount: 0,
+        hasCover: false,
       }),
-    ).toEqual(["title", "description", "rent", "photo", "availability"]);
+    ).toEqual([
+      "title",
+      "description",
+      "rent",
+      "min_stay",
+      "bedroom",
+      "bathrooms",
+      "photo",
+      "cover",
+    ]);
   });
 
   it("accepts a complete listing", () => {

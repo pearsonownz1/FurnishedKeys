@@ -33,7 +33,7 @@ Listing access is `listings.owner_id`, not `profiles.role`. A renter may draft a
 
 ### `listings`
 
-`id`, `owner_id`, `location_id`, `slug`, `title`, `description`, `property_type`, `bedrooms`, `bathrooms`, `max_occupants`, `pets_allowed`, `pet_policy`, `monthly_rent_cents`, `min_stay_months`, `max_stay_months`, `amenities`, `house_rules`, `approx_lat`, `approx_lng`, `address_private`, `management`, `status`, `is_demo`, `listing_fee_status`, `fee_paid_through`, `paid_at`, `admin_note`, `stripe_subscription_id`, `renewal_canceled`, `source`, `reviewed_by`, `reviewed_at`, `rejection_reason`, `created_at`, `updated_at`.
+`id`, `owner_id`, `location_id`, `slug`, `title`, `description`, `property_type`, `bedrooms`, `bathrooms`, `max_occupants`, `pets_allowed`, `pet_policy`, `monthly_rent_cents`, `min_stay_months`, `max_stay_months`, `amenities`, `good_for`, `house_rules`, `square_feet`, `space_description`, `smoking_allowed`, `calendar_updated_at`, `approx_lat`, `approx_lng`, `address_private`, `management`, `status`, `is_demo`, `listing_fee_status`, `fee_paid_through`, `paid_at`, `admin_note`, `stripe_subscription_id`, `renewal_canceled`, `source`, `reviewed_by`, `reviewed_at`, `rejection_reason`, `created_at`, `updated_at`.
 
 Enums:
 
@@ -42,7 +42,7 @@ Enums:
 - `status`: `draft | pending_review | approved | rejected | changes_requested | archived` (default `draft`)
 - `listing_fee_status`: `unpaid | paid | waived` (default `unpaid`)
 
-`amenities` is `text[]`. `bathrooms` is `numeric(3,1)`.
+`amenities` and `good_for` are `text[]` (default `'{}'`). The API accepts only keys from `lib/listings/amenities.ts` and `lib/listings/good-for.ts`. `bathrooms` is `numeric(3,1)`. `square_feet` is an integer greater than zero, or null. `space_description` is the longer “The space” copy. `smoking_allowed` defaults to false. `calendar_updated_at` changes when an availability window or blocked date is inserted, updated, or deleted. `bedrooms` remains the integer count; a trigger sets it from `listing_bedrooms` and does not rewrite existing rows until those child rows change.
 
 A stub draft may leave `slug`, `title`, `bedrooms`, `bathrooms`, `max_occupants`, and `monthly_rent_cents` null. Submit checks completeness in the API. An approved row must have a title, a description, rent greater than zero, and `listing_fee_status` of `paid` or `waived`.
 
@@ -68,9 +68,21 @@ Rent stays on `listings.monthly_rent_cents`. Utilities, deposits, cleaning, pet,
 
 ### `listing_photos`
 
-`id`, `listing_id`, `storage_path`, `caption`, `sort`.
+`id`, `listing_id`, `storage_path`, `caption`, `sort`, `is_cover`.
 
-`storage_path` is unique and must look like `{listing_id}/{filename}` with no `..`.
+`storage_path` is unique and must look like `{listing_id}/{filename}` with no `..`. `is_cover` defaults to false. A partial unique index allows one cover per listing. A trigger rejects a 21st photo, and `POST /api/listings/[id]/photos` checks the same limit before signing uploads. Submit marks the lowest `sort` as the cover when none is set.
+
+### `listing_bedrooms`
+
+`id`, `listing_id`, `sort`, `label`, `beds`.
+
+`beds` is required text such as `King bed`, `3x Bunk beds`, `Queen bed`, `Twin bed`, or `Sofa bed`. `label` defaults to `Bedroom N`, where N is `sort`, when the insert omits it. Public reads follow `listing_is_public`. The owner has full CRUD on their own rows. Admins have all. Deleting the listing cascades.
+
+### `listing_blocked_dates`
+
+`id`, `listing_id`, `start_date`, `end_date`, `note`.
+
+`end_date` is on or after `start_date`. The same RLS as `listing_photos`. Changes here, and changes to `availability_windows`, set `listings.calendar_updated_at` to now.
 
 ### `availability_windows`
 
@@ -133,7 +145,7 @@ RLS is enabled and forced on every table above. `anon` is a signed-out Data API 
 | `profiles` | none | select/update own row; insert own row as `renter` | all |
 | `listings` | select `approved` only while the fee is waived or `fee_paid_through` is still in the future | select those public rows; full CRUD where `owner_id` is self, except review, billing, and `source` | all |
 | `listing_payments` | none | select rows for own listings | select all; writes are service role |
-| `listing_fees`, `listing_photos`, `availability_windows` | select when the listing is `approved` | same, plus full CRUD on children of own listings | all |
+| `listing_fees`, `listing_photos`, `listing_bedrooms`, `listing_blocked_dates`, `availability_windows` | select when the listing is publicly visible | same, plus full CRUD on children of own listings | all |
 | `inquiries` | insert only | insert; select own (`renter_id`), assigned, or owned-listing inquiries; update status/assignee on owned or assigned inquiries | all |
 | `messages` | none | select and insert on inquiries they can read | all, including delete |
 | `owner_leads` | insert only | insert; managers read/update the inbox; assignees read/update their rows | all |
@@ -187,18 +199,30 @@ There are no refunds. Rejecting a listing sets `cancel_at_period_end` when Strip
 
 - `POST /api/owners/start` — `{ full_name, email, phone, property_type, location_id, source? }`. Signed-in callers are reused (the email must match). Anonymous callers are created with `signUp` on the cookie client (random password, not returned) so a session cookie is set when Supabase returns one. This is not `signInWithOtp`, because that cannot return `listing_id` before the email link is opened, and the sign-in page is not built yet. An email that already has an account gets 401 `{ error: "Sign in required", hint }`. The profile role becomes `owner` unless it is already `manager` or `admin`. A draft stub is inserted and the response is `{ listing_id }`.
 - `POST /api/listings` — signed-in draft. Promotes a renter to owner. 401 if signed out.
-- `PATCH /api/listings/[id]` — owner, and only `draft`, `rejected`, or `changes_requested`. Optional `availability` replaces windows.
+- `PATCH /api/listings/[id]` — owner, and only `draft`, `rejected`, or `changes_requested`. Optional `availability` replaces windows. Also accepts `square_feet`, `space_description`, `smoking_allowed`, `amenities` (catalog keys), `good_for` (catalog keys), and `bedrooms: [{ label?, beds }]` which replaces every bedroom row. The integer `listings.bedrooms` is the row count after that write, not a field the client sets.
 - `GET /api/listings/[id]` — owner read, including `paid_at`, `admin_note`, and `renewal_canceled`.
-- `POST /api/listings/[id]/photos` — signed upload URLs under `listing-photos/<listing_id>/...`.
+- `GET /api/listings/[id]/calendar` — owner read of `{ calendar_updated_at, availability, blocked_dates }`.
+- `PUT /api/listings/[id]/calendar` — owner, editable statuses only. Body `{ availability: [{ available_from, available_to? }], blocked_dates: [{ start_date, end_date, note? }] }` replaces both lists and returns the same shape as GET.
+- `POST /api/listings/[id]/photos` — signed upload URLs under `listing-photos/<listing_id>/...`. 422 when the listing would exceed 20 photos.
 - `POST /api/listings/[id]/checkout` — `{ client_secret }` when Stripe is configured. Without `STRIPE_SECRET_KEY`, `{ waived: true, paid_through }`.
 - `GET /api/listings/[id]/checkout/status?session_id=` — `{ status, paid_through }`. A waived listing returns `{ status: "waived", paid_through }` and does not need `session_id`.
-- `POST /api/listings/[id]/submit` — does not charge. Requires a current paid or waived fee, otherwise 402 `{ checkout_url }` (that URL is the checkout route above, which returns a client secret). 422 `{ missing }` when title, description, rent, a photo, or an availability window is absent. Resubmitting after `changes_requested` does not charge again while `fee_paid_through` is still in the future.
+- `POST /api/listings/[id]/submit` — does not charge. Requires a current paid or waived fee, otherwise 402 `{ checkout_url }` (that URL is the checkout route above, which returns a client secret). 422 `{ missing }` lists any of `title`, `description`, `rent`, `min_stay`, `bedroom`, `bathrooms`, `photo`, and `cover` that are absent. If photos exist and none is the cover, submit marks the first by `sort` before that check. Resubmitting after `changes_requested` does not charge again while `fee_paid_through` is still in the future.
 - `POST /api/listings/[id]/cancel-renewal` and `DELETE` — owner only. 503 when Stripe is not configured.
 - `POST /api/stripe/webhook`
 - `POST /api/admin/listings/[id]/review` — `{ action: approve | request_changes | reject, note? }`. `note` is required for request changes and reject. Approve sets `approved`. Request changes sets `changes_requested`. Reject sets `rejected` and cancels renewal at period end when Stripe is configured.
 - `POST /api/admin/listings/[id]/waive` — sets `listing_fee_status = waived`. Admin only.
 
 Front end Embedded Checkout needs `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`. The webhook endpoint to register is `https://furnishedkeys.com/api/stripe/webhook`.
+
+## Public landlord card
+
+`public.public_listing_landlord(listing_id uuid)` is `security definer`. `supabase.rpc("public_listing_landlord", { listing_id })` returns an array of at most one row, and only when `listing_is_public` is true:
+
+```json
+[{ "first_name": "Ada", "last_initial": "L", "member_since": "2026-01-04T00:00:00.000Z" }]
+```
+
+`first_name` is the first word of `profiles.full_name`. `last_initial` is the first letter of the last word, or null when the name is a single word. `member_since` is `profiles.created_at`. A listing that is not publicly visible returns `[]`. The function does not return email, phone, or any other profile field. `anon` and `authenticated` may call it.
 
 ## Deferred
 

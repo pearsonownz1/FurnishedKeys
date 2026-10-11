@@ -2,6 +2,7 @@ import { accessDenied, invalidBody, jsonError, readJson } from "@/lib/api/http";
 import { loadOwnerListing, sessionUser } from "@/lib/api/owner-listing";
 import { requireEditableListing } from "@/lib/listings/access";
 import { listingPhotoPath, photoUploadSchema } from "@/lib/listings/schemas";
+import { MAX_LISTING_PHOTOS, photosExceedLimit } from "@/lib/listings/setup";
 import { LISTING_PHOTOS_BUCKET } from "@/lib/photos";
 
 type Context = { params: Promise<{ id: string }> };
@@ -22,6 +23,15 @@ export async function POST(request: Request, context: Context) {
   }
   const parsed = photoUploadSchema.safeParse(body);
   if (!parsed.success) return invalidBody(parsed.error);
+
+  const existing = await supabase
+    .from("listing_photos")
+    .select("id", { count: "exact", head: true })
+    .eq("listing_id", id);
+  if (existing.error) return jsonError(400, existing.error.message);
+  if (photosExceedLimit(existing.count ?? 0, parsed.data.files.length)) {
+    return jsonError(422, `A listing can have at most ${MAX_LISTING_PHOTOS} photos`);
+  }
 
   const uploads: { path: string; signedUrl: string; token: string }[] = [];
   for (const file of parsed.data.files) {

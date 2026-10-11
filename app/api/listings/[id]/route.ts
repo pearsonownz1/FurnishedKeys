@@ -3,6 +3,7 @@ import { accessDenied, invalidBody, jsonError, readJson } from "@/lib/api/http";
 import { loadOwnerListing, sessionUser } from "@/lib/api/owner-listing";
 import { requireEditableListing, requireOwner } from "@/lib/listings/access";
 import { patchListingSchema } from "@/lib/listings/schemas";
+import { bedroomInserts } from "@/lib/listings/setup";
 
 type Context = { params: Promise<{ id: string }> };
 
@@ -24,7 +25,7 @@ export async function PATCH(request: Request, context: Context) {
   const parsed = patchListingSchema.safeParse(body);
   if (!parsed.success) return invalidBody(parsed.error);
 
-  const { availability, ...fields } = parsed.data;
+  const { availability, bedrooms, ...fields } = parsed.data;
   const defined = Object.fromEntries(
     Object.entries(fields).filter(([, value]) => value !== undefined),
   );
@@ -32,6 +33,17 @@ export async function PATCH(request: Request, context: Context) {
   if (Object.keys(defined).length > 0) {
     const updated = await supabase.from("listings").update(defined as ListingUpdate).eq("id", id);
     if (updated.error) return jsonError(400, updated.error.message);
+  }
+
+  if (bedrooms) {
+    const removed = await supabase.from("listing_bedrooms").delete().eq("listing_id", id);
+    if (removed.error) return jsonError(400, removed.error.message);
+    if (bedrooms.length > 0) {
+      const inserted = await supabase
+        .from("listing_bedrooms")
+        .insert(bedroomInserts(id, bedrooms));
+      if (inserted.error) return jsonError(400, inserted.error.message);
+    }
   }
 
   if (availability) {
