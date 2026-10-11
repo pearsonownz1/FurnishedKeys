@@ -188,6 +188,49 @@ export type DashboardOwner = {
   notifyListingStatus: boolean;
 };
 
+/** Values written by saveProfile, echoed so the settings fields can show them. */
+export type SavedProfileFields = {
+  full_name: string;
+  phone: string;
+  notify_new_inquiry: boolean;
+  notify_new_message: boolean;
+  notify_listing_status: boolean;
+};
+
+export type SettingsFieldValues = {
+  name: string;
+  phone: string;
+  notifyNewInquiry: boolean;
+  notifyNewMessage: boolean;
+  notifyListingStatus: boolean;
+};
+
+/** Saved action values win. Otherwise the fields show what the page loaded. */
+export function settingsFieldValues(
+  owner: Pick<
+    DashboardOwner,
+    "name" | "phone" | "notifyNewInquiry" | "notifyNewMessage" | "notifyListingStatus"
+  >,
+  saved?: SavedProfileFields | null,
+): SettingsFieldValues {
+  if (saved) {
+    return {
+      name: saved.full_name,
+      phone: saved.phone,
+      notifyNewInquiry: saved.notify_new_inquiry,
+      notifyNewMessage: saved.notify_new_message,
+      notifyListingStatus: saved.notify_listing_status,
+    };
+  }
+  return {
+    name: owner.name,
+    phone: owner.phone,
+    notifyNewInquiry: owner.notifyNewInquiry,
+    notifyNewMessage: owner.notifyNewMessage,
+    notifyListingStatus: owner.notifyListingStatus,
+  };
+}
+
 export function setupStepFilled(id: ListingStepId, signals: SetupSignals): boolean {
   switch (id) {
     case "basics":

@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { revalidatePath } from "next/cache";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { confirmAvailability, setBlockedDates } from "@/app/(site)/owner/calendar-actions";
 import { renterReply } from "@/app/(site)/inquiry/actions";
@@ -25,6 +26,7 @@ import {
   messagesFromThread,
   progressCaption,
   resumeHref,
+  settingsFieldValues,
   setupProgress,
   stayHitsBlocked,
   stayRange,
@@ -350,7 +352,18 @@ describe("renter reply", () => {
 
 describe("settings", () => {
   it("saves the profile and refuses a short new password", async () => {
-    const eq = vi.fn().mockResolvedValue({ error: null });
+    const maybeSingle = vi.fn().mockResolvedValue({
+      data: {
+        full_name: "Ada",
+        phone: "541-555-0100",
+        notify_new_inquiry: true,
+        notify_new_message: true,
+        notify_listing_status: false,
+      },
+      error: null,
+    });
+    const select = vi.fn().mockReturnValue({ maybeSingle });
+    const eq = vi.fn().mockReturnValue({ select });
     const update = vi.fn().mockReturnValue({ eq });
     vi.mocked(sessionUser).mockResolvedValue({
       supabase: {
@@ -367,7 +380,18 @@ describe("settings", () => {
     profile.set("phone", "541-555-0100");
     profile.set("notify_new_inquiry", "true");
     profile.set("notify_new_message", "on");
-    expect(await saveProfile({ ok: false }, profile)).toEqual({ ok: true, success: true });
+    const saved = await saveProfile({ ok: false }, profile);
+    expect(saved).toEqual({
+      ok: true,
+      success: true,
+      profile: {
+        full_name: "Ada",
+        phone: "541-555-0100",
+        notify_new_inquiry: true,
+        notify_new_message: true,
+        notify_listing_status: false,
+      },
+    });
     expect(update).toHaveBeenCalledWith({
       full_name: "Ada",
       phone: "541-555-0100",
@@ -375,6 +399,20 @@ describe("settings", () => {
       notify_new_message: true,
       notify_listing_status: false,
     });
+    expect(revalidatePath).toHaveBeenCalledWith("/owner/settings");
+    expect(revalidatePath).toHaveBeenCalledWith("/owner", "layout");
+    expect(
+      settingsFieldValues(
+        {
+          name: "Old name",
+          phone: "",
+          notifyNewInquiry: true,
+          notifyNewMessage: true,
+          notifyListingStatus: true,
+        },
+        saved.profile,
+      ).phone,
+    ).toBe("541-555-0100");
 
     const password = new FormData();
     password.set("current_password", "old-password");
@@ -382,6 +420,61 @@ describe("settings", () => {
     expect(await changePassword({ ok: false }, password)).toEqual({
       ok: false,
       fieldErrors: { new_password: "Use at least 8 characters." },
+    });
+  });
+
+  it("shows the saved phone again when the same number is submitted after a reload", async () => {
+    const phone = "541-555-0199";
+    const row = {
+      full_name: "Ada",
+      phone,
+      notify_new_inquiry: false,
+      notify_new_message: true,
+      notify_listing_status: false,
+    };
+    const maybeSingle = vi.fn().mockResolvedValue({ data: row, error: null });
+    const select = vi.fn().mockReturnValue({ maybeSingle });
+    const eq = vi.fn().mockReturnValue({ select });
+    const update = vi.fn().mockReturnValue({ eq });
+    vi.mocked(sessionUser).mockResolvedValue({
+      supabase: {
+        from: () => ({ update }),
+        auth: {},
+      } as unknown as Awaited<ReturnType<typeof sessionUser>>["supabase"],
+      user: { id: ownerId, email: "delivered+owner@resend.dev" } as NonNullable<
+        Awaited<ReturnType<typeof sessionUser>>["user"]
+      >,
+    });
+
+    const first = new FormData();
+    first.set("full_name", "Ada");
+    first.set("phone", phone);
+    const saved = await saveProfile({ ok: false }, first);
+    const loaded = settingsFieldValues(
+      {
+        name: "Ada",
+        phone: "",
+        notifyNewInquiry: true,
+        notifyNewMessage: true,
+        notifyListingStatus: true,
+      },
+      saved.profile,
+    );
+    expect(loaded.phone).toBe(phone);
+
+    const again = new FormData();
+    again.set("full_name", loaded.name);
+    again.set("phone", loaded.phone);
+    if (loaded.notifyNewMessage) again.set("notify_new_message", "on");
+    maybeSingle.mockResolvedValueOnce({ data: { ...row, phone: loaded.phone }, error: null });
+    const second = await saveProfile(saved, again);
+    expect(second.profile?.phone).toBe(phone);
+    expect(update).toHaveBeenLastCalledWith({
+      full_name: "Ada",
+      phone,
+      notify_new_inquiry: false,
+      notify_new_message: true,
+      notify_listing_status: false,
     });
   });
 });
