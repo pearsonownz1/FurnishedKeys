@@ -8,9 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import {
   amenityChoices,
   dollarsToCents,
-  emptyDraft,
   feeRows,
-  isListingStep,
   listingSteps,
   toListingPatch,
   type DraftPhoto,
@@ -466,10 +464,3 @@ function RenterPreview({ draft }: { draft: ListingDraft }) {
   );
 }
 
-export function stepFromQuery(value: string | undefined): ListingStepId {
-  return isListingStep(value) ? value : "basics";
-}
-
-export function blankDraft(): ListingDraft {
-  return emptyDraft();
-}

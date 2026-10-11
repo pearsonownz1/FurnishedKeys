@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense } from "react";
-import { ListingWizard, stepFromQuery } from "@/components/listing/listing-wizard";
+import { ListingWizard } from "@/components/listing/listing-wizard";
 import { loadListingEditor } from "@/lib/listing-editor-load";
+import { stepFromQuery } from "@/lib/listing-draft";
 import { primaryLocation } from "@/lib/locations";
 
 type Search = Record<string, string | string[] | undefined>;

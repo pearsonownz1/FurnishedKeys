@@ -1,7 +1,7 @@
 import { connection } from "next/server";
 import { Suspense } from "react";
-import { ListingWizard, stepFromQuery } from "@/components/listing/listing-wizard";
-import { emptyDraft } from "@/lib/listing-draft";
+import { ListingWizard } from "@/components/listing/listing-wizard";
+import { emptyDraft, stepFromQuery } from "@/lib/listing-draft";
 import { primaryLocation } from "@/lib/locations";
 
 export const metadata = {

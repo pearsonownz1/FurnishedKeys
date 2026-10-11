@@ -101,6 +101,10 @@ export function isListingStep(value: string | undefined): value is ListingStepId
   return listingSteps.some((step) => step.id === value);
 }
 
+export function stepFromQuery(value: string | undefined): ListingStepId {
+  return isListingStep(value) ? value : "basics";
+}
+
 function optionalInt(value: string): number | null {
   const trimmed = value.trim();
   if (!trimmed) return null;

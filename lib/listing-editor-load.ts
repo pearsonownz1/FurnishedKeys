@@ -9,7 +9,12 @@ export async function loadListingEditor(id: string): Promise<{
 } | null> {
   const { supabase, user } = await sessionUser();
   if (!user) return null;
-  const listing = await loadOwnerListing(supabase, id);
+  let listing;
+  try {
+    listing = await loadOwnerListing(supabase, id);
+  } catch {
+    return null;
+  }
   if (!listing || listing.owner_id !== user.id) return null;
 
   const [fees, photos, windows, address] = await Promise.all([
