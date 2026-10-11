@@ -4,6 +4,7 @@ import { loadRole, loadSetupState, sessionUser, type AppClient } from "@/lib/api
 import { readOwnerListing } from "@/lib/api/read-owner-listing";
 import { missingSubmitFields, requireAdmin } from "@/lib/listings/access";
 import { reviewSchema } from "@/lib/listings/schemas";
+import { revalidateListingPaths } from "@/lib/listings/revalidate-public";
 import { periodEndFromSubscription, recordCancellation } from "@/lib/stripe/apply-fee";
 import { getStripe, serverNotConfigured } from "@/lib/stripe/config";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -59,6 +60,7 @@ export async function POST(request: Request, context: Context) {
       })
       .eq("id", id);
     if (updated.error) return jsonError(400, updated.error.message);
+    revalidateListingPaths(listing.slug);
     await emailOwner(request, listing, "approved", note);
     return listingJson(supabase, id);
   }
@@ -75,6 +77,7 @@ export async function POST(request: Request, context: Context) {
       })
       .eq("id", id);
     if (updated.error) return jsonError(400, updated.error.message);
+    revalidateListingPaths(listing.slug);
     await emailOwner(request, listing, "changes_requested", note);
     return listingJson(supabase, id);
   }
@@ -111,6 +114,7 @@ export async function POST(request: Request, context: Context) {
     })
     .eq("id", id);
   if (updated.error) return jsonError(400, updated.error.message);
+  revalidateListingPaths(listing.slug);
   await emailOwner(request, listing, "rejected", note);
   return listingJson(supabase, id);
 }

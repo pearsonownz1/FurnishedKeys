@@ -16,6 +16,13 @@ export async function submitInquiry(
   if (!listing) {
     return { ok: false, formError: "This home is no longer listed." };
   }
+  if (listing.is_demo) {
+    return {
+      ok: false,
+      formError:
+        "This is a sample listing, so it can't take inquiries. Browse real homes at /rentals.",
+    };
+  }
 
   const validated = validateInquiry(input, {
     minStayMonths: listing.min_stay_months,
@@ -45,6 +52,7 @@ export async function submitInquiry(
       inquiryId,
       renterName: input.name.trim(),
       renterEmail: input.email.trim(),
+      renterPhone: input.phone.trim() || null,
       moveIn: input.moveIn,
       moveOut: input.moveOut,
       occupants: input.occupants,

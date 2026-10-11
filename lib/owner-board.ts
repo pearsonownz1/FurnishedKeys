@@ -1,4 +1,4 @@
-import type { ListingStatus } from "@/lib/db/types";
+import type { InquiryStatus, ListingStatus } from "@/lib/db/types";
 
 export type BoardStatus = "live" | "in_review" | "changes_requested" | "draft" | "rejected";
 
@@ -20,6 +20,14 @@ export type BoardInquiry = {
   name: string;
   message: string;
   createdAt: string;
+  email: string;
+  phone: string | null;
+  move_in: string;
+  move_out: string | null;
+  occupants: number;
+  pets: string | null;
+  status: InquiryStatus;
+  created_at: string;
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;

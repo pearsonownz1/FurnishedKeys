@@ -1,8 +1,13 @@
 import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { revalidatePath } from "next/cache";
 import { POST as review } from "@/app/api/admin/listings/[id]/review/route";
 import { POST as submit } from "@/app/api/listings/[id]/submit/route";
 import { loadOwnerListing, loadRole, loadSetupState, sessionUser } from "@/lib/api/owner-listing";
+
+vi.mock("next/cache", () => ({
+  revalidatePath: vi.fn(),
+}));
 
 vi.mock("@/lib/api/owner-listing", () => ({
   sessionUser: vi.fn(),
@@ -45,6 +50,7 @@ function supabase() {
 const context = { params: Promise.resolve({ id: listingId }) };
 
 beforeEach(() => {
+  vi.mocked(revalidatePath).mockClear();
   vi.mocked(sessionUser).mockReset();
   vi.mocked(loadOwnerListing).mockReset();
   vi.mocked(loadSetupState).mockReset();
@@ -96,6 +102,10 @@ describe("POST /api/listings/[id]/submit", () => {
       status: "pending_review",
       slug: expect.stringMatching(/^pine-adu-[a-f0-9]{8}$/),
     });
+    const slug = db.update.mock.calls[0]?.[0].slug as string;
+    expect(revalidatePath).toHaveBeenCalledWith(`/rentals/${slug}`);
+    expect(revalidatePath).toHaveBeenCalledWith("/rentals");
+    expect(revalidatePath).toHaveBeenCalledWith("/");
     const body = await response.json();
     expect(body.listing.listing_fee_status).toBe("unpaid");
   });
@@ -124,6 +134,7 @@ describe("POST /api/listings/[id]/submit", () => {
       missing: ["bedroom", "photo", "cover"],
     });
     expect(db.update).not.toHaveBeenCalled();
+    expect(revalidatePath).not.toHaveBeenCalled();
   });
 });
 
@@ -138,6 +149,7 @@ describe("POST /api/admin/listings/[id]/review", () => {
     vi.mocked(loadOwnerListing).mockResolvedValue({
       ...listing(),
       status: "pending_review",
+      slug: "pine-adu",
     } as Awaited<ReturnType<typeof loadOwnerListing>>);
     vi.mocked(loadSetupState).mockResolvedValue({
       photos: [{ id: "photo-1", is_cover: true, sort: 0 }],
@@ -159,6 +171,9 @@ describe("POST /api/admin/listings/[id]/review", () => {
     expect(db.update).toHaveBeenCalledWith(
       expect.objectContaining({ status: "approved", rejection_reason: null }),
     );
+    expect(revalidatePath).toHaveBeenCalledWith("/rentals/pine-adu");
+    expect(revalidatePath).toHaveBeenCalledWith("/rentals");
+    expect(revalidatePath).toHaveBeenCalledWith("/");
     const body = await response.json();
     expect(body.listing.listing_fee_status).toBe("unpaid");
   });

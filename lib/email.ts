@@ -1,3 +1,4 @@
+import { locationById } from "@/lib/locations";
 import { createServiceClient } from "@/lib/supabase/service";
 
 const RESEND_URL = "https://api.resend.com/emails";
@@ -16,11 +17,37 @@ export type InquiryNotice = {
   inquiryId: string;
   renterName: string;
   renterEmail: string;
+  renterPhone: string | null;
   moveIn: string;
   moveOut: string;
   occupants: number;
   pets: string | null;
   message: string;
+};
+
+export type InquiryReply = {
+  to: string;
+  listingTitle: string;
+  body: string;
+  replyTo: string;
+};
+
+/** Guy's address. Preview tests override this with LEADS_NOTIFY_TO. */
+export const DEFAULT_LEADS_NOTIFY_TO = "guy@gcs.org";
+
+export type OwnerLeadNotice = {
+  name: string;
+  email: string;
+  phone: string | null;
+  interest: string | null;
+  propertyType: string | null;
+  furnished: string | null;
+  locationId: string | null;
+  propertyAddress: string | null;
+  currentUse: string | null;
+  availableFrom: string | null;
+  notes: string | null;
+  source: string;
 };
 
 export type ReviewDecision = "approved" | "changes_requested" | "rejected";
@@ -37,6 +64,16 @@ export type SendResult = { id: string | null; detail: string };
 
 /** Sends through Resend. With no API key, logs the message and does not send. Never throws. */
 export async function sendEmail(message: OutboundEmail): Promise<SendResult> {
+  const to = message.to.trim();
+  if (to.toLowerCase().endsWith(".example")) {
+    console.info("email skipped (example domain)", {
+      to,
+      subject: message.subject,
+      detail: "skipped:example-domain",
+    });
+    return { id: null, detail: "skipped:example-domain" };
+  }
+
   const apiKey = process.env.RESEND_API_KEY?.trim();
   if (!apiKey) {
     console.info("email skipped (no RESEND_API_KEY)", {
@@ -56,7 +93,7 @@ export async function sendEmail(message: OutboundEmail): Promise<SendResult> {
 
   const payload: Record<string, unknown> = {
     from,
-    to: [message.to],
+    to: [to],
     subject: message.subject,
     html: message.html,
   };
@@ -89,6 +126,8 @@ export async function sendEmail(message: OutboundEmail): Promise<SendResult> {
 export function inquiryNoticeHtml(input: {
   listingTitle: string;
   renterName: string;
+  renterEmail: string;
+  renterPhone: string | null;
   moveIn: string;
   moveOut: string;
   occupants: number;
@@ -97,14 +136,42 @@ export function inquiryNoticeHtml(input: {
   inquiryUrl: string;
 }): string {
   const pets = input.pets?.trim() ? input.pets.trim() : "None";
+  const phone = input.renterPhone?.trim() ? input.renterPhone.trim() : "None";
   return layout(
     `<p style="margin:0 0 16px;">New inquiry for <strong>${escapeHtml(input.listingTitle)}</strong>.</p>` +
       field("Renter", input.renterName) +
+      field("Email", input.renterEmail) +
+      field("Phone", phone) +
       field("Dates", `${input.moveIn} to ${input.moveOut}`) +
       field("Occupants", String(input.occupants)) +
       field("Pets", pets) +
       field("Message", input.message) +
       `<p style="margin:24px 0 0;"><a href="${escapeHtml(input.inquiryUrl)}">View this inquiry</a></p>`,
+  );
+}
+
+export function inquiryReplyHtml(body: string): string {
+  return layout(`<p style="margin:0;">${escapeHtml(body).replaceAll("\n", "<br>")}</p>`);
+}
+
+export function ownerLeadNoticeHtml(lead: OwnerLeadNotice): string {
+  const location = lead.locationId
+    ? (locationById(lead.locationId)?.name ?? lead.locationId)
+    : "None";
+  return layout(
+    `<p style="margin:0 0 16px;">New owner lead.</p>` +
+      field("Name", lead.name) +
+      field("Email", lead.email) +
+      field("Phone", lead.phone?.trim() || "None") +
+      field("Interest", lead.interest?.trim() || "None") +
+      field("Property address", lead.propertyAddress?.trim() || "None") +
+      field("Property type", lead.propertyType?.trim() || "None") +
+      field("Furnished", lead.furnished?.trim() || "None") +
+      field("Location", location) +
+      field("Current use", lead.currentUse?.trim() || "None") +
+      field("Available from", lead.availableFrom?.trim() || "None") +
+      field("Notes", lead.notes?.trim() || "None") +
+      field("Source", lead.source?.trim() || "None"),
   );
 }
 
@@ -145,6 +212,41 @@ export async function deliverInquiryNotice(notice: InquiryNotice): Promise<SendR
   } catch (error) {
     const reason = error instanceof Error ? error.message : "error";
     console.error("inquiry email failed", reason);
+    return { id: null, detail: `failed:${reason}`.slice(0, 180) };
+  }
+}
+
+/** Emails the renter the owner's reply. A failure is logged and swallowed. */
+export async function deliverInquiryReply(reply: InquiryReply): Promise<SendResult> {
+  try {
+    return await sendEmail({
+      to: reply.to,
+      subject: `Re: your inquiry for ${oneLine(reply.listingTitle)}`,
+      html: inquiryReplyHtml(reply.body),
+      replyTo: reply.replyTo,
+    });
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : "error";
+    console.error("inquiry reply email failed", reason);
+    return { id: null, detail: `failed:${reason}`.slice(0, 180) };
+  }
+}
+
+/** Sends an owner-lead alert. A failure is logged and swallowed. */
+export async function deliverOwnerLeadNotice(lead: OwnerLeadNotice): Promise<SendResult> {
+  const to = process.env.LEADS_NOTIFY_TO?.trim() || DEFAULT_LEADS_NOTIFY_TO;
+  const interest = oneLine(lead.interest?.trim() || "unspecified");
+  const address = oneLine(lead.propertyAddress?.trim() || "no address");
+  try {
+    return await sendEmail({
+      to,
+      subject: `New owner lead: ${interest} – ${address}`,
+      html: ownerLeadNoticeHtml(lead),
+      replyTo: lead.email,
+    });
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : "error";
+    console.error("owner lead email failed", reason);
     return { id: null, detail: `failed:${reason}`.slice(0, 180) };
   }
 }
