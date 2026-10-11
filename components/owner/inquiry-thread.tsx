@@ -16,7 +16,7 @@ export function InquiryThread({ messages }: { messages: InquiryThreadMessage[] }
           >
             <p className="whitespace-pre-wrap">{message.body}</p>
             <small className={mine ? "mt-1.5 block text-[11px] text-white/70" : "mt-1.5 block text-[11px] text-muted"}>
-              {message.name} · {message.timeLabel}
+              {[message.name, message.timeLabel].filter(Boolean).join(" · ")}
               {message.emailed ? " · emailed" : ""}
             </small>
           </li>

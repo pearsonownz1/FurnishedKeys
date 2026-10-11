@@ -1,6 +1,6 @@
 "use client";
 
-import { confirmOwnerAvailability } from "@/app/(owner)/owner/actions";
+import { confirmOwnerAvailability, toggleBlockedDay } from "@/app/(owner)/owner/calendar-actions";
 import { StayCalendar } from "@/components/listing/stay-calendar";
 import { useRouter } from "next/navigation";
 import { useActionState, useState } from "react";
@@ -9,14 +9,39 @@ export function OwnerCalendar({
   listings,
   listingId,
   blocked,
+  month,
 }: {
   listings: { id: string; title: string }[];
   listingId: string | null;
   blocked: string[];
+  month: string;
 }) {
   const router = useRouter();
   const [days, setDays] = useState(blocked);
-  const [state, formAction, pending] = useActionState(confirmOwnerAvailability, null);
+  const [confirmState, confirmAction, confirmPending] = useActionState(confirmOwnerAvailability, { ok: false });
+  const [blockState, blockAction, blockPending] = useActionState(
+    async (previous: Awaited<ReturnType<typeof toggleBlockedDay>>, formData: FormData) => {
+      const result = await toggleBlockedDay(previous, formData);
+      if (!result.ok) {
+        const iso = String(formData.get("day"));
+        const wanted = formData.get("blocked") === "true";
+        setDays((current) => (wanted ? current.filter((day) => day !== iso) : [...current, iso].sort()));
+      }
+      return result;
+    },
+    { ok: false },
+  );
+
+  function toggle(iso: string) {
+    if (!listingId || blockPending) return;
+    const nextBlocked = !days.includes(iso);
+    setDays((current) => (nextBlocked ? [...current, iso].sort() : current.filter((day) => day !== iso)));
+    const data = new FormData();
+    data.set("listingId", listingId);
+    data.set("day", iso);
+    data.set("blocked", nextBlocked ? "true" : "false");
+    void blockAction(data);
+  }
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto px-5 py-8 pb-24 md:px-10 md:py-8 md:pb-8">
@@ -25,20 +50,26 @@ export function OwnerCalendar({
           <h1 className="font-serif text-[40px] leading-[1.05] font-normal">Calendar</h1>
           <p className="mt-1.5 text-muted">Block days you can&apos;t host.</p>
         </div>
-        <form action={formAction}>
+        <form action={confirmAction}>
           <input type="hidden" name="listingId" value={listingId ?? ""} />
           <button
             type="submit"
-            disabled={pending || !listingId}
+            disabled={confirmPending || !listingId}
             className="border border-line bg-white px-3.5 py-2 text-[13px] font-semibold disabled:opacity-70"
           >
             Confirm availability
           </button>
         </form>
       </div>
-      {state?.formError ? (
+      {confirmState?.formError ? (
         <p className="mt-4 text-sm text-warn" role="alert">
-          {state.formError}
+          {confirmState.formError}
+        </p>
+      ) : null}
+      {confirmState?.success ? <p className="mt-4 text-sm text-pine">Availability confirmed</p> : null}
+      {blockState?.formError ? (
+        <p className="mt-4 text-sm text-warn" role="alert">
+          {blockState.formError}
         </p>
       ) : null}
       {listings.length === 0 || !listingId ? (
@@ -51,7 +82,7 @@ export function OwnerCalendar({
               className="h-[46px] w-full border border-line bg-white px-3 text-base"
               value={listingId}
               onChange={(event) => {
-                router.push(`/owner/calendar?listing=${event.target.value}`);
+                router.push(`/owner/calendar?listing=${event.target.value}&month=${month}`);
               }}
             >
               {listings.map((listing) => (
@@ -64,11 +95,11 @@ export function OwnerCalendar({
           <div className="mt-6">
             <StayCalendar
               blocked={days}
-              onToggle={(iso) =>
-                setDays((current) =>
-                  current.includes(iso) ? current.filter((day) => day !== iso) : [...current, iso],
-                )
-              }
+              month={month}
+              onToggle={toggle}
+              onMonthChange={(next) => {
+                router.push(`/owner/calendar?listing=${listingId}&month=${next}`);
+              }}
             />
           </div>
         </div>

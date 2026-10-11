@@ -22,11 +22,13 @@ import {
   listingStatusGroup,
   listingStepProgress,
   matchesListingFilter,
+  messagesFromThread,
   progressCaption,
   resumeHref,
   setupProgress,
   stayHitsBlocked,
   stayRange,
+  stepCaption,
   threadMessages,
   type SetupSignals,
 } from "@/lib/owner-dashboard";
@@ -663,37 +665,42 @@ describe("owner dashboard listing cards", () => {
   });
 
   it("gives a draft continue setup and a live home edit plus confirm", () => {
+    const draftHref = "/owners/listings/11111111-1111-4111-8111-111111111111/setup?step=photos";
     const draft = listingActions({
       id: "11111111-1111-4111-8111-111111111111",
-      status: "draft",
+      statusGroup: "draft",
       slug: null,
-      progress: setupProgress(signals({ title: "Home", bedroomCount: 1, bathrooms: 1 })),
+      resumeHref: draftHref,
     });
     expect(draft.actions.map((action) => action.label)).toEqual(["Continue setup"]);
-    expect(draft.cardHref).toContain("step=photos");
+    expect(draft.cardHref).toBe(draftHref);
     expect(draft.actions[0]?.tone).toBe("primary");
 
+    const liveHref = "/owners/listings/22222222-2222-4222-8222-222222222222/setup?step=basics";
     const live = listingActions({
       id: "22222222-2222-4222-8222-222222222222",
-      status: "live",
+      statusGroup: "live",
       slug: "orchard",
-      progress: setupProgress(signals({ title: "Home", bedroomCount: 1, bathrooms: 1, photoCount: 1, description: "Hi", goodFor: ["students"], amenities: ["wifi"], monthlyRentCents: 100, availableFrom: "2026-11-01", houseRules: "None" })),
+      resumeHref: liveHref,
     });
     expect(live.actions.map((action) => action.label)).toEqual(["Edit", "Confirm dates"]);
+    expect(live.actions[0]?.href).toBe(liveHref);
     expect(live.actions.every((action) => action.tone === "secondary")).toBe(true);
     expect(live.actions[1]?.href).toContain("/owner/calendar?listing=");
+    expect(stepCaption(3, 10, "Photos")).toBe("Step 3 of 10 · Photos next");
   });
 
-  it("counts the filter tabs and writes the live caption", () => {
+  it("counts the filter tabs from the loader status group", () => {
     expect(
       filterCounts([
-        { status: "draft" },
-        { status: "in_review" },
-        { status: "live" },
-        { status: "rejected" },
+        { statusGroup: "draft" },
+        { statusGroup: "review" },
+        { statusGroup: "live" },
+        { statusGroup: "draft" },
       ]),
-    ).toEqual({ all: 4, drafts: 1, review: 1, live: 1 });
-    expect(matchesListingFilter("changes_requested", "review")).toBe(true);
+    ).toEqual({ all: 4, drafts: 2, review: 1, live: 1 });
+    expect(matchesListingFilter("review", "review")).toBe(true);
+    expect(matchesListingFilter("draft", "review")).toBe(false);
     const progress = setupProgress(signals());
     expect(
       listingStatusCaption({
@@ -754,5 +761,31 @@ describe("owner dashboard inbox", () => {
     expect(messages[1]).toMatchObject({ name: "You", emailed: true });
     expect(inquiryPreview(messages)).toBe("Great! What's the next step?");
     expect(inquiryPreview(messages.slice(0, 2))).toBe("You: Yes, it is in the unit.");
+
+    const fromLoader = messagesFromThread({
+      inquiryId: "inq",
+      message: "Is the washer in-unit?",
+      renterName: "Jordan M.",
+      now,
+      messages: [
+        {
+          id: "m1",
+          sender_role: "owner",
+          body: "Yes, it is in the unit.",
+          created_at: "2026-10-11T17:30:00.000Z",
+          emailed: true,
+        },
+        {
+          id: "m2",
+          sender_role: "renter",
+          body: "Great! What's the next step?",
+          created_at: "2026-10-11T18:18:00.000Z",
+          emailed: false,
+        },
+      ],
+    });
+    expect(fromLoader.map((message) => message.from)).toEqual(["renter", "owner", "renter"]);
+    expect(fromLoader[1]).toMatchObject({ name: "You", emailed: true });
+    expect(fromLoader[2]).not.toHaveProperty("emailed");
   });
 });

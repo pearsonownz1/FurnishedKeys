@@ -3,7 +3,6 @@ import { expandRanges } from "@/lib/calendar-ranges";
 import { isListingStep, listingSteps, type ListingStepId } from "@/lib/listing-draft";
 import { missingSubmitFields, type CompletenessInput } from "@/lib/listings/access";
 import type { BoardStatus } from "@/lib/owner-board";
-import { ownerListingPath } from "@/lib/site";
 
 export const REQUIRED_LISTING_FIELDS = 8;
 
@@ -184,6 +183,9 @@ export type DashboardOwner = {
   email: string;
   phone: string;
   initials: string;
+  notifyNewInquiry: boolean;
+  notifyNewMessage: boolean;
+  notifyListingStatus: boolean;
 };
 
 export function setupStepFilled(id: ListingStepId, signals: SetupSignals): boolean {
@@ -246,29 +248,30 @@ export function progressCaption(progress: SetupProgress): string {
   return `Step ${progress.step} of ${progress.total} · ${progress.nextLabel} next`;
 }
 
-export function setupHref(id: string, step: ListingStepId): string {
-  return `${ownerListingPath(id, "setup")}?step=${step}`;
-}
-
 export function listingFilter(value: string | undefined): ListingFilter {
   if (value === "drafts" || value === "review" || value === "live" || value === "all") return value;
   return "all";
 }
 
-export function matchesListingFilter(status: BoardStatus, filter: ListingFilter): boolean {
+export function matchesListingFilter(group: ListingStatusGroup, filter: ListingFilter): boolean {
   if (filter === "all") return true;
-  if (filter === "drafts") return status === "draft";
-  if (filter === "review") return status === "in_review" || status === "changes_requested";
-  return status === "live";
+  if (filter === "drafts") return group === "draft";
+  if (filter === "review") return group === "review";
+  return group === "live";
 }
 
-export function filterCounts(listings: { status: BoardStatus }[]) {
+export function filterCounts(listings: { statusGroup: ListingStatusGroup }[]) {
   return {
     all: listings.length,
-    drafts: listings.filter((listing) => matchesListingFilter(listing.status, "drafts")).length,
-    review: listings.filter((listing) => matchesListingFilter(listing.status, "review")).length,
-    live: listings.filter((listing) => matchesListingFilter(listing.status, "live")).length,
+    drafts: listings.filter((listing) => matchesListingFilter(listing.statusGroup, "drafts")).length,
+    review: listings.filter((listing) => matchesListingFilter(listing.statusGroup, "review")).length,
+    live: listings.filter((listing) => matchesListingFilter(listing.statusGroup, "live")).length,
   };
+}
+
+/** Card line from the loader's step fields. */
+export function stepCaption(stepIndex: number, stepCount: number, nextStepLabel: string): string {
+  return `Step ${stepIndex} of ${stepCount} · ${nextStepLabel} next`;
 }
 
 export function listingDetailLine(listing: {
@@ -307,29 +310,27 @@ export function listingStatusCaption(input: {
 
 export function listingActions(listing: {
   id: string;
-  status: BoardStatus;
+  statusGroup: ListingStatusGroup;
   slug: string | null;
-  progress: SetupProgress;
+  resumeHref: string;
 }): { cardHref: string; actions: ListingAction[] } {
-  const edit = setupHref(listing.id, listing.status === "draft" ? listing.progress.setupStep : "basics");
-  if (listing.status === "draft" || listing.status === "rejected" || listing.status === "changes_requested") {
-    const href = setupHref(listing.id, listing.progress.setupStep);
+  if (listing.statusGroup === "draft") {
     return {
-      cardHref: href,
-      actions: [{ label: "Continue setup", href, tone: "primary" }],
+      cardHref: listing.resumeHref,
+      actions: [{ label: "Continue setup", href: listing.resumeHref, tone: "primary" }],
     };
   }
-  if (listing.status === "in_review") {
-    const view = listing.slug ? `/rentals/${listing.slug}` : edit;
+  if (listing.statusGroup === "review") {
+    const view = listing.slug ? `/rentals/${listing.slug}` : listing.resumeHref;
     return {
       cardHref: view,
       actions: [{ label: "View", href: view, tone: "secondary" }],
     };
   }
   return {
-    cardHref: edit,
+    cardHref: listing.resumeHref,
     actions: [
-      { label: "Edit", href: edit, tone: "secondary" },
+      { label: "Edit", href: listing.resumeHref, tone: "secondary" },
       { label: "Confirm dates", href: `/owner/calendar?listing=${listing.id}`, tone: "secondary" },
     ],
   };
@@ -461,8 +462,45 @@ function shortUtcDate(iso: string): string {
 
 export function inquiryStatusTone(status: InquiryStatus): string {
   if (status === "responded") return "bg-pine-l text-pine-d";
-  if (status === "closed") return "bg-stone text-muted";
+  if (status === "closed" || status === "declined") return "bg-stone text-muted";
   return "bg-[#f4ead8] text-warn";
+}
+
+export function messagesFromThread(input: {
+  inquiryId: string;
+  message: string;
+  renterName: string;
+  messages: {
+    id: string;
+    sender_role: "owner" | "renter";
+    body: string;
+    created_at: string;
+    emailed: boolean;
+  }[];
+  now: Date;
+}): InquiryThreadMessage[] {
+  const name = firstName(input.renterName);
+  const rest = input.messages.map((message) => ({
+    id: message.id,
+    body: message.body,
+    from: message.sender_role,
+    name: message.sender_role === "owner" ? "You" : name,
+    timeLabel: agoLabel(message.created_at, input.now),
+    ...(message.emailed ? { emailed: true } : {}),
+  }));
+  const opening = input.message.trim();
+  const first = rest[0];
+  if (!opening || (first?.from === "renter" && first.body.trim() === opening)) return rest;
+  return [
+    {
+      id: `${input.inquiryId}-inquiry`,
+      body: input.message,
+      from: "renter",
+      name,
+      timeLabel: "",
+    },
+    ...rest,
+  ];
 }
 
 export type DashboardListing = {
@@ -470,12 +508,17 @@ export type DashboardListing = {
   title: string;
   city: string;
   status: BoardStatus;
+  statusGroup: ListingStatusGroup;
   typeLabel: string;
   bedLabel: string | null;
   rentLabel: string | null;
   coverUrl: string | null;
   slug: string | null;
-  progress: SetupProgress;
+  stepIndex: number;
+  stepCount: number;
+  nextStepLabel: string;
+  percentComplete: number;
+  resumeHref: string;
   caption: string;
   inquiryCount: number;
   lastConfirmedAt: string | null;

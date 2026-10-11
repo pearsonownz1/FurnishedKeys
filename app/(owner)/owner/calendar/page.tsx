@@ -1,8 +1,7 @@
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { OwnerCalendar } from "@/components/owner/owner-calendar";
-import { loadBlockedDates } from "@/lib/owner-adapters";
-import { loadOwnerDashboard } from "@/lib/owner-dashboard-load";
+import { loadCalendar, loadOwnerDashboard } from "@/lib/owner-dashboard-load";
 import { canonical } from "@/lib/site";
 
 export const metadata = {
@@ -12,6 +11,10 @@ export const metadata = {
 };
 
 type Search = Record<string, string | string[] | undefined>;
+
+function currentMonth(now = new Date()): string {
+  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+}
 
 export default function CalendarPage({ searchParams }: { searchParams: Promise<Search> }) {
   return (
@@ -24,11 +27,22 @@ export default function CalendarPage({ searchParams }: { searchParams: Promise<S
 async function Calendar({ searchParams }: { searchParams: Promise<Search> }) {
   await connection();
   const params = await searchParams;
-  const raw = params.listing;
-  const requested = Array.isArray(raw) ? raw[0] : raw;
+  const rawListing = params.listing;
+  const requested = Array.isArray(rawListing) ? rawListing[0] : rawListing;
+  const rawMonth = params.month;
+  const monthValue = Array.isArray(rawMonth) ? rawMonth[0] : rawMonth;
+  const month = monthValue && /^\d{4}-\d{2}$/.test(monthValue) ? monthValue : currentMonth();
   const dashboard = await loadOwnerDashboard();
   const listings = dashboard.listings.map((listing) => ({ id: listing.id, title: listing.title }));
   const listingId = listings.some((listing) => listing.id === requested) ? requested! : (listings[0]?.id ?? null);
-  const blocked = listingId ? await loadBlockedDates(listingId) : [];
-  return <OwnerCalendar key={listingId ?? "none"} listings={listings} listingId={listingId} blocked={blocked} />;
+  const calendar = listingId ? await loadCalendar(listingId, month) : null;
+  return (
+    <OwnerCalendar
+      key={`${listingId ?? "none"}-${month}`}
+      listings={listings}
+      listingId={listingId}
+      blocked={calendar?.blocked_days ?? []}
+      month={month}
+    />
+  );
 }

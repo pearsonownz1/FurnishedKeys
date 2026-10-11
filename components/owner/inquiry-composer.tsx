@@ -1,6 +1,6 @@
 "use client";
 
-import { replyToInquiry } from "@/app/(owner)/owner/actions";
+import { replyToInquiry } from "@/app/(site)/owner/actions";
 import type { ReplyActionState } from "@/lib/owner-reply";
 import { useRouter } from "next/navigation";
 import { useActionState, useState } from "react";

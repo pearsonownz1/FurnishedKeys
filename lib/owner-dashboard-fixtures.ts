@@ -4,16 +4,15 @@ import {
   filterCounts,
   initials,
   inquiryPreview,
-  listingStatusCaption,
   monthDay,
-  setupProgress,
+  resumeHref,
   stayRange,
+  stepCaption,
   threadMessages,
   type DashboardInquiry,
   type DashboardListing,
   type DashboardOwner,
   type OwnerDashboardData,
-  type SetupSignals,
 } from "@/lib/owner-dashboard";
 
 const ownerId = "11111111-1111-4111-8111-111111111111";
@@ -25,25 +24,6 @@ function cityName(): string {
   return locationById("c3a1e0b2-4d5f-4a6b-8c7d-111111111101")?.name ?? "";
 }
 
-function filled(patch: Partial<SetupSignals>): SetupSignals {
-  return {
-    title: "Home",
-    bedroomCount: 1,
-    bathrooms: 1,
-    photoCount: 3,
-    description: "A furnished one-bedroom with a full kitchen.",
-    goodFor: ["remote_workers"],
-    amenities: ["wifi", "washer_dryer"],
-    monthlyRentCents: 185_000,
-    availableFrom: "2026-11-01",
-    houseRules: "Quiet after 10.",
-    petPolicy: null,
-    petsAllowed: false,
-    smokingAllowed: false,
-    ...patch,
-  };
-}
-
 /** Sample board used only when local dev has no signed-in owner. */
 export function fixtureDashboard(now = new Date()): OwnerDashboardData {
   const city = cityName();
@@ -52,86 +32,73 @@ export function fixtureDashboard(now = new Date()): OwnerDashboardData {
     email: "guy@furnishedkeys.com",
     phone: "",
     initials: initials("Guy Pearson", "guy@furnishedkeys.com"),
+    notifyNewInquiry: true,
+    notifyNewMessage: true,
+    notifyListingStatus: true,
   };
-  const draftProgress = setupProgress(
-    filled({
-      title: "Charming Home on West Side",
-      photoCount: 0,
-      description: "",
-      goodFor: [],
-      amenities: [],
-      monthlyRentCents: null,
-      availableFrom: null,
-      houseRules: null,
-    }),
-  );
-  const ready = setupProgress(filled({}));
+  const draftHref = resumeHref(draftId, "photos");
+  const reviewHref = resumeHref(reviewId, "review");
+  const liveHref = resumeHref(liveId, "review");
   const listings: DashboardListing[] = [
     {
       id: draftId,
       title: "Charming Home on West Side",
       city,
       status: "draft",
+      statusGroup: "draft",
       typeLabel: "ADU",
       bedLabel: null,
       rentLabel: null,
       coverUrl: null,
       slug: null,
-      progress: draftProgress,
+      stepIndex: 3,
+      stepCount: 10,
+      nextStepLabel: "Photos",
+      percentComplete: 25,
+      resumeHref: draftHref,
       inquiryCount: 0,
       lastConfirmedAt: null,
-      caption: listingStatusCaption({
-        status: "draft",
-        progress: draftProgress,
-        submittedOn: null,
-        confirmedAgo: null,
-        inquiryCount: 0,
-        adminNote: null,
-      }),
+      caption: stepCaption(3, 10, "Photos"),
     },
     {
       id: reviewId,
       title: "NW Crossing backyard cottage",
       city,
       status: "in_review",
+      statusGroup: "review",
       typeLabel: "ADU",
       bedLabel: "1 bed",
       rentLabel: "$2,350/mo",
       coverUrl: "/demo/p1.jpg",
       slug: "detached-adu-river-trail",
-      progress: ready,
+      stepIndex: 10,
+      stepCount: 10,
+      nextStepLabel: "Review",
+      percentComplete: 100,
+      resumeHref: reviewHref,
       inquiryCount: 0,
       lastConfirmedAt: null,
-      caption: listingStatusCaption({
-        status: "in_review",
-        progress: ready,
-        submittedOn: "Oct 10",
-        confirmedAgo: null,
-        inquiryCount: 0,
-        adminNote: null,
-      }),
+      caption: "Submitted Oct 10 · usually 1 business day",
     },
     {
       id: liveId,
       title: "Orchard District one-bedroom",
       city,
       status: "live",
+      statusGroup: "live",
       typeLabel: "Apartment",
       bedLabel: "1 bed",
       rentLabel: "$1,850/mo",
       coverUrl: "/demo/p2.jpg",
       slug: "orchard-one-bedroom",
-      progress: ready,
+      stepIndex: 10,
+      stepCount: 10,
+      nextStepLabel: "Review",
+      percentComplete: 100,
+      resumeHref: liveHref,
       inquiryCount: 2,
       lastConfirmedAt: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-      caption: listingStatusCaption({
-        status: "live",
-        progress: ready,
-        submittedOn: null,
-        confirmedAgo: confirmedAgo(new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString(), now),
-        inquiryCount: 2,
-        adminNote: null,
-      }),
+      caption: `Calendar confirmed ${confirmedAgo(new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString(), now)} · 2 inquiries`,
     },
   ];
 

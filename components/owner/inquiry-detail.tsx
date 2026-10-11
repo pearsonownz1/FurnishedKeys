@@ -45,7 +45,7 @@ export function InquiryDetail({ inquiry }: { inquiry: DashboardInquiry }) {
             ) : null}
           </div>
         </div>
-        <DeclineInquiryButton inquiryId={inquiry.id} />
+        <DeclineInquiryButton inquiryId={inquiry.id} onDeclined={() => setStatus("declined")} />
       </header>
       <Link href="/owner/inquiries" className="border-b border-line px-4 py-2 text-sm font-semibold text-pine md:hidden">
         Back

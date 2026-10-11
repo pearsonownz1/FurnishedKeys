@@ -1,20 +1,16 @@
 import { cache } from "react";
 import { sessionUser } from "@/lib/api/owner-listing";
-import type { AvailabilityWindow, Inquiry, InquiryStatus, Listing, ListingPhoto, ListingStatus, Message } from "@/lib/db/types";
+import type { InquiryStatus, ListingStatus } from "@/lib/db/types";
 import { listingOwnerColumns } from "@/lib/db/types";
 import { isListingStep, type ListingStepId } from "@/lib/listing-draft";
 import { locationById, primaryLocation } from "@/lib/locations";
-import { formatCents } from "@/lib/money";
 import { fixtureDashboard } from "@/lib/owner-dashboard-fixtures";
 import {
   blockedDaysInMonth,
-  confirmedAgo,
   filterCounts,
   firstName,
   initials,
-  inquiryPreview,
   listingPercent,
-  listingStatusCaption,
   listingStatusGroup,
   listingStepProgress,
   listTime,
@@ -23,18 +19,15 @@ import {
   occupantLabel,
   petsLabel,
   resumeHref,
-  setupProgress,
   stayRange,
-  threadMessages,
+  stepCaption,
   type DashboardInquiry,
   type DashboardListing,
   type OwnerDashboardData,
   type OwnerListingCard,
-  type SetupSignals,
 } from "@/lib/owner-dashboard";
 import { boardStatus } from "@/lib/owner-board";
-import { bedFact, propertyTypeName } from "@/lib/property-display";
-import { LISTING_PHOTOS_BUCKET, LISTING_PHOTO_TTL_SECONDS, signListingPhotoPaths } from "@/lib/photos";
+import { LISTING_PHOTOS_BUCKET, LISTING_PHOTO_TTL_SECONDS } from "@/lib/photos";
 
 export type InboxInquiry = {
   id: string;
@@ -354,212 +347,95 @@ export async function loadSettings(): Promise<SettingsProfile | null> {
   };
 }
 
-type OwnerRow = Pick<Listing, (typeof listingOwnerColumns)[number]>;
-
 function fixturesAllowed(): boolean {
   return process.env.NODE_ENV !== "production";
 }
 
-function asNumber(value: unknown): number | null {
-  if (value == null || value === "") return null;
-  const number = typeof value === "number" ? value : Number(value);
-  return Number.isFinite(number) ? number : null;
+function listingCaption(card: OwnerListingCard): string {
+  if (card.status_group === "draft") {
+    return stepCaption(card.step_index, card.step_count, card.next_step_label);
+  }
+  if (card.status === "pending_review") {
+    const when = monthDay(card.updated_at);
+    return when ? `Submitted ${when} · usually 1 business day` : "Submitted · usually 1 business day";
+  }
+  return "";
 }
 
-function coverPath(photos: Pick<ListingPhoto, "storage_path" | "sort" | "is_cover">[]): string | null {
-  if (photos.length === 0) return null;
-  const marked = photos.find((photo) => photo.is_cover);
-  if (marked) return marked.storage_path;
-  return [...photos].sort((left, right) => left.sort - right.sort)[0]?.storage_path ?? null;
+function toListing(card: OwnerListingCard): DashboardListing {
+  return {
+    id: card.id,
+    title: card.title?.trim() || "Untitled listing",
+    city: card.city ?? "",
+    status: boardStatus(card.status),
+    statusGroup: card.status_group,
+    typeLabel: "",
+    bedLabel: null,
+    rentLabel: null,
+    coverUrl: card.cover_url,
+    slug: null,
+    stepIndex: card.step_index,
+    stepCount: card.step_count,
+    nextStepLabel: card.next_step_label,
+    percentComplete: card.percent_complete,
+    resumeHref: card.resume_href,
+    caption: listingCaption(card),
+    inquiryCount: 0,
+    lastConfirmedAt: null,
+  };
+}
+
+function toInquiry(row: InboxInquiry, now: Date): DashboardInquiry {
+  const at = row.last_message_at;
+  return {
+    id: row.id,
+    listingId: "",
+    listingTitle: row.listing_title,
+    name: row.name,
+    firstName: firstName(row.name),
+    email: row.email,
+    phone: row.phone,
+    status: row.status,
+    createdAt: at ?? "",
+    listTime: at ? listTime(at, now) : "",
+    dateLabel: stayRange(row.move_in, row.move_out),
+    occupantLabel: occupantLabel(row.occupants),
+    petsLabel: petsLabel(row.pets),
+    preview: row.last_message_snippet,
+    unread: row.unread_count > 0,
+    messages: [],
+  };
 }
 
 export const loadOwnerDashboard = cache(async (): Promise<OwnerDashboardData> => {
-  const { supabase, user } = await sessionUser();
+  const { user } = await sessionUser();
   if (!user) {
     if (fixturesAllowed()) return fixtureDashboard();
     return emptyDashboard();
   }
 
-  const profile = await supabase
-    .from("profiles")
-    .select("full_name, email, phone")
-    .eq("id", user.id)
-    .maybeSingle();
-  if (profile.error) throw new Error(profile.error.message);
-
-  const name = profile.data?.full_name?.trim() || "";
-  const email = profile.data?.email?.trim() || user.email || "";
-  const phone = profile.data?.phone?.trim() || "";
-
-  const { data, error } = await supabase
-    .from("listings")
-    .select(listingOwnerColumns.join(","))
-    .eq("owner_id", user.id)
-    .order("updated_at", { ascending: false });
-  if (error) throw new Error(error.message);
-
-  const rows = (data ?? []) as unknown as OwnerRow[];
-  const ids = rows.map((row) => row.id);
+  const [settings, cards, inbox] = await Promise.all([loadSettings(), loadOwnerListings(), loadInbox()]);
   const now = new Date();
-  const photosByListing = new Map<string, ListingPhoto[]>();
-  const bedroomsByListing = new Map<string, number>();
-  const availableFrom = new Map<string, string | null>();
-  const confirmedAt = new Map<string, string | null>();
-  const inquiries: DashboardInquiry[] = [];
-
-  if (ids.length > 0) {
-    const [photos, bedrooms, windows, inquiryRows] = await Promise.all([
-      supabase.from("listing_photos").select("*").in("listing_id", ids),
-      supabase.from("listing_bedrooms").select("id, listing_id").in("listing_id", ids),
-      supabase.from("availability_windows").select("*").in("listing_id", ids),
-      supabase.from("inquiries").select("*").in("listing_id", ids).in("status", ["new", "responded"]),
-    ]);
-    if (photos.error) throw new Error(photos.error.message);
-    if (bedrooms.error) throw new Error(bedrooms.error.message);
-    if (windows.error) throw new Error(windows.error.message);
-    if (inquiryRows.error) throw new Error(inquiryRows.error.message);
-
-    for (const photo of (photos.data ?? []) as ListingPhoto[]) {
-      const list = photosByListing.get(photo.listing_id) ?? [];
-      list.push(photo);
-      photosByListing.set(photo.listing_id, list);
-    }
-    for (const room of bedrooms.data ?? []) {
-      bedroomsByListing.set(room.listing_id, (bedroomsByListing.get(room.listing_id) ?? 0) + 1);
-    }
-    for (const window of (windows.data ?? []) as AvailabilityWindow[]) {
-      const current = availableFrom.get(window.listing_id);
-      if (!current || window.available_from < current) {
-        availableFrom.set(window.listing_id, window.available_from);
-      }
-      const confirmed = confirmedAt.get(window.listing_id) ?? null;
-      const next = window.last_confirmed_at;
-      if (!confirmed || (next && next > confirmed)) confirmedAt.set(window.listing_id, next);
-    }
-
-    const inquiryList = (inquiryRows.data ?? []) as Inquiry[];
-    const inquiryIds = inquiryList.map((inquiry) => inquiry.id);
-    const repliesByInquiry = new Map<string, Message[]>();
-    if (inquiryIds.length > 0) {
-      const messages = await supabase
-        .from("messages")
-        .select("*")
-        .in("inquiry_id", inquiryIds)
-        .order("created_at", { ascending: true });
-      if (messages.error) throw new Error(messages.error.message);
-      for (const message of (messages.data ?? []) as Message[]) {
-        const list = repliesByInquiry.get(message.inquiry_id) ?? [];
-        list.push(message);
-        repliesByInquiry.set(message.inquiry_id, list);
-      }
-    }
-
-    const titles = new Map(rows.map((row) => [row.id, row.title?.trim() || "Listing"]));
-    for (const inquiry of inquiryList) {
-      const replies = [...(repliesByInquiry.get(inquiry.id) ?? [])].sort((left, right) =>
-        left.created_at.localeCompare(right.created_at),
-      );
-      const messages = threadMessages({
-        inquiryId: inquiry.id,
-        body: inquiry.message,
-        createdAt: inquiry.created_at,
-        renterName: inquiry.name,
-        ownerId: user.id,
-        now,
-        replies: replies.map((message) => ({
-          id: message.id,
-          body: message.body,
-          createdAt: message.created_at,
-          senderId: message.sender_id,
-        })),
-      });
-      const latestAt = replies.at(-1)?.created_at ?? inquiry.created_at;
-      inquiries.push({
-        id: inquiry.id,
-        listingId: inquiry.listing_id,
-        listingTitle: titles.get(inquiry.listing_id) ?? "Listing",
-        name: inquiry.name,
-        firstName: firstName(inquiry.name),
-        email: inquiry.email,
-        phone: inquiry.phone,
-        status: inquiry.status,
-        createdAt: latestAt,
-        listTime: listTime(latestAt, now),
-        dateLabel: stayRange(inquiry.move_in, inquiry.move_out),
-        occupantLabel: occupantLabel(inquiry.occupants),
-        petsLabel: petsLabel(inquiry.pets),
-        preview: inquiryPreview(messages),
-        unread: inquiry.status === "new",
-        messages,
-      });
-    }
-    inquiries.sort((left, right) => right.createdAt.localeCompare(left.createdAt));
-  }
-
-  const signed = await signListingPhotoPaths(
-    [...photosByListing.values()].map((photos) => coverPath(photos)).filter((path): path is string => Boolean(path)),
-  );
-  const inquiryCount = new Map<string, number>();
-  for (const inquiry of inquiries) {
-    inquiryCount.set(inquiry.listingId, (inquiryCount.get(inquiry.listingId) ?? 0) + 1);
-  }
-
-  const listings: DashboardListing[] = rows.map((row) => {
-    const photos = photosByListing.get(row.id) ?? [];
-    const bedroomCount = bedroomsByListing.get(row.id) ?? 0;
-    const beds = bedroomCount > 0 ? bedroomCount : row.bedrooms;
-    const status = boardStatus(row.status);
-    const signals: SetupSignals = {
-      title: row.title,
-      bedroomCount: beds ?? 0,
-      bathrooms: asNumber(row.bathrooms),
-      photoCount: photos.length,
-      description: row.description,
-      goodFor: row.good_for ?? [],
-      amenities: row.amenities ?? [],
-      monthlyRentCents: row.monthly_rent_cents,
-      availableFrom: availableFrom.get(row.id) ?? null,
-      houseRules: row.house_rules,
-      petPolicy: row.pet_policy,
-      petsAllowed: row.pets_allowed,
-      smokingAllowed: row.smoking_allowed,
-    };
-    const progress = setupProgress(signals);
-    const lastConfirmedAt = confirmedAt.get(row.id) ?? null;
-    const count = inquiryCount.get(row.id) ?? 0;
-    const rent = row.monthly_rent_cents != null && row.monthly_rent_cents > 0 ? `${formatCents(row.monthly_rent_cents)}/mo` : null;
-    const path = coverPath(photos);
-    return {
-      id: row.id,
-      title: row.title?.trim() || "Untitled listing",
-      city: locationById(row.location_id)?.name ?? "",
-      status,
-      typeLabel: propertyTypeName(row.property_type),
-      bedLabel: bedFact(beds),
-      rentLabel: rent,
-      coverUrl: path ? (signed.get(path) ?? null) : null,
-      slug: row.slug,
-      progress,
-      inquiryCount: count,
-      lastConfirmedAt,
-      caption: listingStatusCaption({
-        status,
-        progress,
-        submittedOn: monthDay(row.updated_at),
-        confirmedAgo: confirmedAgo(lastConfirmedAt, now),
-        inquiryCount: count,
-        adminNote: row.admin_note,
-      }),
-    };
-  });
+  const name = settings?.full_name?.trim() || "";
+  const email = settings?.email?.trim() || user.email || "";
+  const listings = cards.map(toListing);
+  const inquiries = inbox.inquiries.map((row) => toInquiry(row, now));
 
   return {
     signedIn: true,
-    owner: { name: name || email, email, phone, initials: initials(name, email) },
+    owner: {
+      name: name || email,
+      email,
+      phone: settings?.phone?.trim() || "",
+      initials: initials(name, email),
+      notifyNewInquiry: settings?.notify_new_inquiry ?? true,
+      notifyNewMessage: settings?.notify_new_message ?? true,
+      notifyListingStatus: settings?.notify_listing_status ?? true,
+    },
     locationId: primaryLocation().id,
     listings,
     inquiries,
-    unread: inquiries.filter((inquiry) => inquiry.unread).length,
+    unread: inbox.unread_total,
     counts: filterCounts(listings),
   };
 });
@@ -567,7 +443,15 @@ export const loadOwnerDashboard = cache(async (): Promise<OwnerDashboardData> =>
 function emptyDashboard(): OwnerDashboardData {
   return {
     signedIn: false,
-    owner: { name: "", email: "", phone: "", initials: "" },
+    owner: {
+      name: "",
+      email: "",
+      phone: "",
+      initials: "",
+      notifyNewInquiry: true,
+      notifyNewMessage: true,
+      notifyListingStatus: true,
+    },
     locationId: primaryLocation().id,
     listings: [],
     inquiries: [],

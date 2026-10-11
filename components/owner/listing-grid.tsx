@@ -31,7 +31,7 @@ export function ListingGrid({
   locationId: string;
   banner: string | null;
 }) {
-  const visible = listings.filter((listing) => matchesListingFilter(listing.status, filter));
+  const visible = listings.filter((listing) => matchesListingFilter(listing.statusGroup, filter));
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto px-5 py-8 pb-24 md:px-10 md:py-8 md:pb-8">
@@ -103,7 +103,12 @@ function ListingCard({ listing }: { listing: DashboardListing }) {
         <h2 className="mt-2 text-[15px] font-semibold">{listing.title}</h2>
         <p className="text-[13px] text-muted">{listingDetailLine(listing)}</p>
         <div className="mt-3 h-1 bg-stone" aria-hidden="true">
-          <span className="block h-full bg-pine" style={{ width: `${listing.progress.percent}%` }} />
+          <span
+            className="block h-full bg-pine"
+            style={{
+              width: `${listing.statusGroup === "draft" ? (listing.stepIndex / listing.stepCount) * 100 : listing.percentComplete}%`,
+            }}
+          />
         </div>
         <p className="mt-1.5 text-[13px] text-muted">{listing.caption}</p>
       </div>

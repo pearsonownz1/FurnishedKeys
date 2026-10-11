@@ -4,12 +4,13 @@ import type { DashboardInquiry } from "@/lib/owner-dashboard";
 
 export function InquiryInbox({
   inquiries,
-  selectedId,
+  selected,
+  missing = false,
 }: {
   inquiries: DashboardInquiry[];
-  selectedId: string | null;
+  selected: DashboardInquiry | null;
+  missing?: boolean;
 }) {
-  const selected = inquiries.find((inquiry) => inquiry.id === selectedId) ?? null;
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden border border-line bg-white">
@@ -59,7 +60,7 @@ export function InquiryInbox({
         {selected ? (
           <InquiryDetail key={`${selected.id}-${selected.messages.length}-${selected.status}`} inquiry={selected} />
         ) : (
-          <p className="p-6 text-muted">Select an inquiry.</p>
+          <p className="p-6 text-muted">{missing ? "That inquiry is not on your board." : "Select an inquiry."}</p>
         )}
       </div>
     </div>
