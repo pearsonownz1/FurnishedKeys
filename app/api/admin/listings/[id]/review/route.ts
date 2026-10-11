@@ -1,4 +1,5 @@
-import { accessDenied, invalidBody, jsonError, readJson } from "@/lib/api/http";
+import { accessDenied, invalidBody, jsonError, readJson, requestOrigin } from "@/lib/api/http";
+import { deliverReviewDecision } from "@/lib/email";
 import { loadRole, loadSetupState, sessionUser, type AppClient } from "@/lib/api/owner-listing";
 import { readOwnerListing } from "@/lib/api/read-owner-listing";
 import { missingSubmitFields, requireAdmin } from "@/lib/listings/access";
@@ -58,6 +59,7 @@ export async function POST(request: Request, context: Context) {
       })
       .eq("id", id);
     if (updated.error) return jsonError(400, updated.error.message);
+    await emailOwner(request, listing, "approved", note);
     return listingJson(supabase, id);
   }
 
@@ -73,6 +75,7 @@ export async function POST(request: Request, context: Context) {
       })
       .eq("id", id);
     if (updated.error) return jsonError(400, updated.error.message);
+    await emailOwner(request, listing, "changes_requested", note);
     return listingJson(supabase, id);
   }
 
@@ -108,7 +111,27 @@ export async function POST(request: Request, context: Context) {
     })
     .eq("id", id);
   if (updated.error) return jsonError(400, updated.error.message);
+  await emailOwner(request, listing, "rejected", note);
   return listingJson(supabase, id);
+}
+
+async function emailOwner(
+  request: Request,
+  listing: { owner_id: string; title: string | null },
+  decision: "approved" | "changes_requested" | "rejected",
+  note: string | null,
+) {
+  try {
+    await deliverReviewDecision({
+      ownerId: listing.owner_id,
+      listingTitle: listing.title?.trim() || "Your listing",
+      decision,
+      note,
+      origin: requestOrigin(request),
+    });
+  } catch (error) {
+    console.error("review email failed", error instanceof Error ? error.message : "error");
+  }
 }
 
 async function listingJson(supabase: AppClient, id: string) {

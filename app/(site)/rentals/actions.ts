@@ -1,5 +1,6 @@
 "use server";
 
+import { deliverInquiryNotice } from "@/lib/email";
 import type { InquiryActionState } from "@/lib/inquiry";
 import { readInquiryForm, toInquiryInsert, validateInquiry } from "@/lib/inquiry";
 import { getPublicListings } from "@/lib/listings";
@@ -26,12 +27,35 @@ export async function submitInquiry(
     return { ok: false, fieldErrors: validated.fieldErrors };
   }
 
-  // Anonymous insert only. A missing error means the row was accepted.
-  // Do not read the inserted inquiry back.
+  // Anonymous insert only. The id is chosen here so the owner email can link
+  // to the inquiry. Do not read the inserted inquiry back.
+  const inquiryId = crypto.randomUUID();
   const supabase = createPublicClient();
-  const { error } = await supabase.from("inquiries").insert(toInquiryInsert(input));
+  const { error } = await supabase
+    .from("inquiries")
+    .insert({ ...toInquiryInsert(input), id: inquiryId });
   if (error) {
     return { ok: false, formError: logInsertError("inquiries", error) };
+  }
+
+  try {
+    await deliverInquiryNotice({
+      ownerId: listing.owner_id,
+      listingTitle: listing.title,
+      inquiryId,
+      renterName: input.name.trim(),
+      renterEmail: input.email.trim(),
+      moveIn: input.moveIn,
+      moveOut: input.moveOut,
+      occupants: input.occupants,
+      pets: input.pets.trim() || null,
+      message: input.message.trim(),
+    });
+  } catch (emailError) {
+    console.error(
+      "inquiry email failed",
+      emailError instanceof Error ? emailError.message : "error",
+    );
   }
 
   return { ok: true, success: true };

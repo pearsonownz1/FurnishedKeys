@@ -98,6 +98,8 @@ Rent stays on `listings.monthly_rent_cents`. Utilities, deposits, cleaning, pet,
 
 Anonymous and signed-in visitors can insert a row with `status = new`, `assigned_to` null, and `renter_id` null or their own id. They cannot read it back unless they are signed in and `renter_id` is their id. The listing owner, the assignee, and admins can read the thread. Owners and assignees can update `status` and `assigned_to` only. Admins can edit the rest.
 
+After that insert succeeds, the server emails the listing owner. The id is chosen before the insert so the message can link to `/owner#inquiry-{id}` without reading the row back. The HTML includes the listing title, the renter's name, desired dates, occupants, pets (or "None"), and message. Reply-To is the renter's email. The owner's address is read with the service role from `profiles`. A missing `RESEND_API_KEY` logs the email and does not send. A lookup or send failure is logged and the inquiry still succeeds.
+
 ### `messages`
 
 `id`, `inquiry_id`, `sender_id`, `body`, `created_at`.
@@ -211,7 +213,7 @@ There are no refunds. Rejecting a listing sets `cancel_at_period_end` when Strip
 - `POST /api/listings/[id]/submit` — does not charge and does not check the fee. 422 `{ missing }` lists any of `title`, `description`, `rent`, `min_stay`, `bedroom`, `bathrooms`, `photo`, and `cover` that are absent. If photos exist and none is the cover, submit marks the first by `sort` before that check. A complete listing becomes `pending_review`.
 - `POST /api/listings/[id]/cancel-renewal` and `DELETE` — owner only. 503 when Stripe is not configured.
 - `POST /api/stripe/webhook`
-- `POST /api/admin/listings/[id]/review` — `{ action: approve | request_changes | reject, note? }`. `note` is required for request changes and reject. Approve sets `approved` when the same completeness list is empty, with no fee check. Request changes sets `changes_requested`. Reject sets `rejected` and cancels renewal at period end when Stripe is configured.
+- `POST /api/admin/listings/[id]/review` — `{ action: approve | request_changes | reject, note? }`. `note` is required for request changes and reject. Approve sets `approved` when the same completeness list is empty, with no fee check. Request changes sets `changes_requested`. Reject sets `rejected` and cancels renewal at period end when Stripe is configured. After the status write succeeds, the owner is emailed: approved, changes requested (the note is in the message), or rejected (the note is in the message). A mail failure does not change the JSON response. `EMAIL_FROM` is the From address. With no `RESEND_API_KEY`, the email is logged and not sent.
 - `POST /api/admin/listings/[id]/waive` — sets `listing_fee_status = waived`. Admin only.
 
 Front end Embedded Checkout needs `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`. The webhook endpoint to register is `https://furnishedkeys.com/api/stripe/webhook`.
