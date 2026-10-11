@@ -10,8 +10,27 @@ const links = [
   { href: "/sign-in", label: "Sign in" },
 ] as const;
 
+function ownerFlow(pathname: string) {
+  return pathname === "/owners/start" || pathname.startsWith("/owners/listings/");
+}
+
 export function SiteHeader({ tone = "solid" }: { tone?: "overlay" | "solid" }) {
   const pathname = usePathname();
+  if (ownerFlow(pathname)) {
+    return (
+      <header className="border-b border-line bg-surface text-ink">
+        <div className="flex h-16 items-center justify-between gap-3 px-5 md:px-8">
+          <Link href="/" className="font-serif text-[22px] tracking-[-0.3px] sm:text-[26px]">
+            Furnished <span className="italic">Keys</span>
+          </Link>
+          <Link href="/owners" className="text-sm">
+            Save and exit
+          </Link>
+        </div>
+      </header>
+    );
+  }
+
   const overlay = tone === "overlay";
   const listClass = overlay
     ? "rounded-[2px] border border-white/70 px-3.5 py-2 text-sm"

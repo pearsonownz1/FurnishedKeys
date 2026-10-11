@@ -24,6 +24,9 @@ export async function GET(request: Request) {
   const code = url.searchParams.get("code");
   const supabase = await createClient();
 
+  // verifyOtp and exchangeCodeForSession both store the session cookie and
+  // confirm an existing unconfirmed account. shouldCreateUser stays false on
+  // the sign-in form, so this only completes users who already exist.
   if (tokenHash && isOtpType(type)) {
     const verified = await supabase.auth.verifyOtp({ type, token_hash: tokenHash });
     if (!verified.error) redirect(next);

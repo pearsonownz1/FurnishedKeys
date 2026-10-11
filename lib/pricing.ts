@@ -1,10 +1,15 @@
-import { formatCents } from "@/lib/money";
+import { formatCents, formatCentsExact } from "@/lib/money";
 
 /** Yearly listing subscription, in cents. Used when STRIPE_LISTING_PRICE_ID is unset. */
 export const SELF_LIST_PRICE_CENTS = 19_900;
 
 export function listingFeeAmount(): string {
   return formatCents(SELF_LIST_PRICE_CENTS);
+}
+
+/** "$199.00" */
+export function listingFeeExact(): string {
+  return formatCentsExact(SELF_LIST_PRICE_CENTS);
 }
 
 /** "$199/year" */

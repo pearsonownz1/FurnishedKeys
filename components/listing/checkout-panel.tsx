@@ -5,16 +5,18 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { StripeEmbed } from "@/components/listing/stripe-embed";
 import { parseCheckoutPost } from "@/lib/checkout";
-import { listingFeeAmount, listingFeePerYear } from "@/lib/pricing";
+import { listingFeeAmount, listingFeeExact } from "@/lib/pricing";
 
 const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? "";
 
 export function CheckoutPanel({
   listingId,
-  title,
+  propertyType,
+  placeLabel,
 }: {
   listingId: string;
-  title: string;
+  propertyType: string;
+  placeLabel: string;
 }) {
   const router = useRouter();
   const [autoRenew, setAutoRenew] = useState(true);
@@ -22,6 +24,9 @@ export function CheckoutPanel({
   const [error, setError] = useState<string | null>(null);
   const [needsSignIn, setNeedsSignIn] = useState(false);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const where = [propertyType, placeLabel].filter(Boolean).join(" in ");
+  const price = listingFeeExact();
+  const signInHref = `/sign-in?next=${encodeURIComponent(`/owners/listings/${listingId}/checkout`)}`;
 
   async function pay(renew: boolean) {
     setPending(true);
@@ -38,7 +43,7 @@ export function CheckoutPanel({
       console.error("checkout", response.status, body);
       setClientSecret(null);
       setNeedsSignIn(response.status === 401);
-      setError(checkoutError(body, response.status));
+      setError(response.status === 401 ? null : checkoutError(body, response.status));
       setPending(false);
       return;
     }
@@ -62,17 +67,12 @@ export function CheckoutPanel({
   const showCard = Boolean(clientSecret && publishableKey);
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
-      <div className="min-w-0">
-        <p className="text-xs tracking-[0.14em] text-muted uppercase">Checkout</p>
-        <h1 className="mt-3 font-serif text-[clamp(2.5rem,5vw,4rem)] leading-none font-normal tracking-[-0.8px]">
-          {listingFeeAmount()} a year
+    <div className="grid min-h-[calc(100vh-4rem)] lg:grid-cols-[minmax(0,1fr)_minmax(280px,420px)]">
+      <div className="min-w-0 px-5 py-12 md:px-10 lg:py-16 lg:pr-16 lg:pl-[max(1.25rem,calc((100vw-1200px)/2))]">
+        <h1 className="font-serif text-[clamp(2.5rem,5vw,4rem)] leading-none font-normal tracking-[-0.8px]">
+          Pay and start your listing
         </h1>
-        <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-muted">
-          {title.trim() || "Your listing"} stays in draft until this fee is recorded. Then we
-          review it before it goes live.
-        </p>
-        <label className="mt-8 flex items-start gap-3 text-sm">
+        <label className="mt-8 flex max-w-xl items-start gap-3 rounded-[2px] border border-line px-4 py-4 text-sm">
           <input
             type="checkbox"
             className="mt-1"
@@ -83,10 +83,13 @@ export function CheckoutPanel({
               if (showCard) void pay(renew);
             }}
           />
-          <span>Renew automatically each year. You can turn this off later.</span>
+          <span>
+            <span className="block">Renew automatically each year.</span>
+            <span className="mt-1 block text-muted">You can turn this off later.</span>
+          </span>
         </label>
         {showCard && clientSecret ? (
-          <div className="mt-6">
+          <div className="mt-6 max-w-xl">
             <StripeEmbed clientSecret={clientSecret} publishableKey={publishableKey} />
           </div>
         ) : (
@@ -96,31 +99,43 @@ export function CheckoutPanel({
             onClick={() => void pay(autoRenew)}
             className="mt-6 rounded-[2px] bg-pine px-5 py-3 text-sm font-semibold text-white disabled:opacity-70"
           >
-            Process payment
+            Pay {listingFeeAmount()} and set up my listing
           </button>
         )}
+        {needsSignIn ? (
+          <p className="mt-4 text-sm text-warn" role="alert">
+            Your session ended.{" "}
+            <Link href={signInHref} className="font-semibold text-pine">
+              Sign in
+            </Link>{" "}
+            to continue
+          </p>
+        ) : null}
         {error ? (
           <p className="mt-4 text-sm text-warn" role="alert">
             {error}{" "}
-            {needsSignIn ? (
-              <Link
-                href={`/sign-in?next=${encodeURIComponent(`/owners/listings/${listingId}/checkout`)}`}
-                className="font-semibold text-pine"
-              >
-                Sign in
-              </Link>
-            ) : null}{" "}
             <button type="button" className="font-semibold text-pine" onClick={() => void pay(autoRenew)}>
               Try again
             </button>
           </p>
         ) : null}
       </div>
-      <aside className="h-fit border border-line bg-surface px-5 py-5">
-        <h2 className="text-sm font-semibold">Order summary</h2>
-        <p className="mt-3 text-sm">{title.trim() || "Listing fee"}</p>
-        <p className="mt-4 font-serif text-4xl leading-none text-pine">{listingFeePerYear()}</p>
-        <p className="mt-1 text-sm text-muted">per listing</p>
+      <aside className="bg-stone px-6 py-12 md:px-8 lg:py-16">
+        <div className="flex items-baseline justify-between gap-4">
+          <p className="text-sm">Listing{where ? ` · ${where}` : ""}</p>
+          <p className="text-sm">{price}</p>
+        </div>
+        <div className="mt-4 flex items-baseline justify-between gap-4 text-sm">
+          <p>Term</p>
+          <p>1 year</p>
+        </div>
+        <div className="mt-6 flex items-baseline justify-between gap-4 border-t border-line pt-4 text-sm font-semibold">
+          <p>Due today</p>
+          <p>{price}</p>
+        </div>
+        <p className="mt-6 text-sm leading-relaxed text-muted">
+          Next, you&apos;ll add photos…
+        </p>
       </aside>
     </div>
   );

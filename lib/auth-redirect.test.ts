@@ -26,8 +26,11 @@ describe("safeNext", () => {
     expect(form).toContain("Check your email");
     expect(confirm).toContain("verifyOtp");
     expect(confirm).toContain("exchangeCodeForSession");
+    expect(confirm).toContain('"magiclink"');
+    expect(confirm).toContain('"signup"');
     expect(confirm).toContain("createClient");
     expect(header).toContain('href: "/sign-in", label: "Sign in"');
+    expect(header).toContain("Save and exit");
     expect(start).toContain("/sign-in?next=%2Fowners%2Fstart");
   });
 });
