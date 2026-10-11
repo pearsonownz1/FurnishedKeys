@@ -1,36 +1,36 @@
-import Link from "next/link";
-import { listingFeeAmount, listingFeeCadenceLabel, listingFeePerYear } from "@/lib/pricing";
+import { connection } from "next/server";
+import { Suspense } from "react";
+import { ListingWizard, stepFromQuery } from "@/components/listing/listing-wizard";
+import { emptyDraft } from "@/lib/listing-draft";
+import { primaryLocation } from "@/lib/locations";
 
 export const metadata = {
   title: "List your property",
-  description:
-    "Reach renters looking for a few months, not a few nights. The listing fee is billed yearly. Checkout is not open yet.",
+  description: "Create a furnished listing. The fee is billed yearly.",
 };
 
-export default function ListPage() {
+type Search = Record<string, string | string[] | undefined>;
+
+export default function ListPage({ searchParams }: { searchParams: Promise<Search> }) {
   return (
-    <div className="shell max-w-3xl py-14 lg:py-20">
-      <h1 className="font-serif text-[clamp(2.5rem,5vw,3.5rem)] leading-none font-normal tracking-[-0.8px]">
-        List your property
-      </h1>
-      <p className="mt-5 max-w-xl text-[17px] leading-relaxed text-muted">
-        Reach renters looking for a few months, not a few nights. Your listing,
-        messages, and calendar stay with you.
-      </p>
-      <div className="mt-10 max-w-md border border-line bg-surface px-5 py-5">
-        <p className="font-semibold">List it yourself</p>
-        <p className="mt-1 text-sm text-muted">
-          {listingFeeAmount()} {listingFeeCadenceLabel()} ({listingFeePerYear()}). Billed
-          yearly and renews automatically.
-        </p>
-      </div>
-      <p className="mt-8 text-[15px] leading-relaxed text-ink">
-        Prefer a free rental assessment first?{" "}
-        <Link href="/owners#assessment" className="font-semibold text-pine">
-          Tell us about the property
-        </Link>
-        .
-      </p>
-    </div>
+    <Suspense fallback={<p className="px-5 py-16 text-muted">Loading…</p>}>
+      <NewListing searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function NewListing({ searchParams }: { searchParams: Promise<Search> }) {
+  await connection();
+  const params = await searchParams;
+  const raw = params.step;
+  const location = primaryLocation();
+
+  return (
+    <ListingWizard
+      listingId={null}
+      locationId={location.id}
+      initial={emptyDraft()}
+      initialStep={stepFromQuery(Array.isArray(raw) ? raw[0] : raw)}
+    />
   );
 }
