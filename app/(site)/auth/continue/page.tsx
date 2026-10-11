@@ -46,7 +46,9 @@ async function Continue({ searchParams }: { searchParams: Promise<Search> }) {
             <p className="text-[17px] leading-relaxed text-muted">
               {link.type === "recovery"
                 ? "Continue to choose a new password."
-                : "Continue to finish signing in."}
+                : link.type === "email_change"
+                  ? "Continue to confirm this email."
+                  : "Continue to finish signing in."}
             </p>
             <button
               type="submit"

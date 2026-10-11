@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { sessionUser } from "@/lib/api/owner-listing";
+import { deliverEmailChange } from "@/lib/auth-mail";
 import type { SavedProfileFields } from "@/lib/owner-dashboard";
 
 export type SettingsState = {
@@ -16,8 +17,6 @@ export type SettingsState = {
   /** Row read back after a successful profile save. */
   profile?: SavedProfileFields;
 };
-
-const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function checked(value: FormDataEntryValue | null): boolean {
   return value === "true" || value === "on" || value === "1";
@@ -72,29 +71,18 @@ export async function saveProfile(
   };
 }
 
-/** Asks Supabase to email a confirmation link. The address changes after that link is opened. */
+/** Emails confirm links through Resend. The address changes after both links are opened. */
 export async function changeEmail(
   _previous: SettingsState,
   formData: FormData,
 ): Promise<SettingsState> {
-  const { supabase, user } = await sessionUser();
-  if (!user) return { ok: false, formError: "Sign in again." };
+  const { user } = await sessionUser();
+  if (!user?.email) return { ok: false, formError: "Sign in again." };
 
-  const email = String(formData.get("email") ?? "").trim();
-  if (!emailPattern.test(email) || email.length > 200) {
-    return { ok: false, fieldErrors: { email: "Add a valid email." } };
-  }
-
-  const updated = await supabase.auth.updateUser({ email });
-  if (updated.error) {
-    console.error("email change failed", updated.error.message);
-    return { ok: false, formError: "We couldn't update your email. Please try again." };
-  }
-  return {
-    ok: true,
-    success: true,
-    message: "Check your inbox to confirm the new email.",
-  };
+  return deliverEmailChange({
+    currentEmail: user.email,
+    newEmail: String(formData.get("email") ?? ""),
+  });
 }
 
 /** Re-checks the current password, then sets the new one. New password is 8 to 72 characters. */

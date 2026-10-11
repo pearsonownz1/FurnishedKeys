@@ -39,6 +39,7 @@ describe("confirm routing", () => {
   it("sends recovery to the password page and failures to the right notice", () => {
     expect(destinationFor({ type: "recovery", next: "/owner" })).toBe("/reset-password");
     expect(destinationFor({ type: "signup", next: "/owner/listings" })).toBe("/owner/listings");
+    expect(destinationFor({ type: "email_change", next: "/owner/settings" })).toBe("/owner/settings");
     expect(failureFor("recovery", "/owner")).toBe("/forgot-password?error=link");
     expect(failureFor("signup", "/owner")).toBe("/sign-in?error=link&next=%2Fowner");
   });
@@ -118,5 +119,19 @@ describe("GET and POST /auth/confirm", () => {
     expect(response.headers.get("location")).toBe("https://furnishedkeys.com/reset-password");
     expect(exchangeCodeForSession).toHaveBeenCalledWith("pkce-code");
     expect(verifyOtp).not.toHaveBeenCalled();
+  });
+
+  it("verifies an email change and follows next", async () => {
+    const body = new FormData();
+    body.set("token_hash", token);
+    body.set("type", "email_change");
+    body.set("next", "/owner/settings");
+    const response = await POST(
+      new Request("https://furnishedkeys.com/auth/confirm", { method: "POST", body }),
+    );
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("https://furnishedkeys.com/owner/settings");
+    expect(verifyOtp).toHaveBeenCalledWith({ type: "email_change", token_hash: token });
   });
 });

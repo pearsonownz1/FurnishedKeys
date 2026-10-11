@@ -41,8 +41,9 @@ describe("safeNext", () => {
     expect(form).toContain("Create an account");
     expect(form).toContain("Wrong email or password");
     expect(form).toContain("dashboardForRole");
-    expect(forgot).toContain("resetPasswordForEmail");
-    expect(forgot).toContain("/auth/confirm?next=/reset-password");
+    expect(forgot).toContain("requestPasswordReset");
+    expect(forgot).not.toContain("resetPasswordForEmail");
+    expect(forgot).not.toContain("createClient");
     expect(forgot).toContain("If that email has an account, we sent a reset link.");
     expect(forgot).not.toContain("Check your email");
     expect(forgot).toContain('method="post"');

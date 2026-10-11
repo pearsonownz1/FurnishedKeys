@@ -1,44 +1,20 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useActionState } from "react";
+import { requestPasswordReset } from "@/app/(site)/forgot-password/actions";
 import { useHydrated } from "@/components/auth/use-hydrated";
-import { createClient } from "@/lib/supabase/client";
+import type { PasswordResetState } from "@/lib/auth-mail";
 
 const fieldClass =
   "h-[46px] w-full rounded-[2px] border border-line bg-surface px-3 text-[15px]";
 
-const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const empty: PasswordResetState = { ok: false };
 
 export function ForgotPasswordForm({ notice }: { notice: string }) {
   const hydrated = useHydrated();
-  const [email, setEmail] = useState("");
-  const [pending, setPending] = useState(false);
-  const [fieldError, setFieldError] = useState<string | null>(null);
-  const [sent, setSent] = useState(false);
+  const [state, action, pending] = useActionState(requestPasswordReset, empty);
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const address = email.trim();
-    if (!emailPattern.test(address)) {
-      setFieldError("Add a valid email.");
-      return;
-    }
-    setPending(true);
-    setFieldError(null);
-    try {
-      const supabase = createClient();
-      const { error } = await supabase.auth.resetPasswordForEmail(address, {
-        redirectTo: `${window.location.origin}/auth/confirm?next=/reset-password`,
-      });
-      if (error) console.error("forgot-password", error.message);
-    } catch (error) {
-      console.error("forgot-password", error);
-    }
-    setPending(false);
-    setSent(true);
-  }
-
-  if (sent) {
+  if (state.success) {
     return (
       <p role="status" className="max-w-xl text-[17px] leading-relaxed">
         If that email has an account, we sent a reset link.
@@ -47,7 +23,7 @@ export function ForgotPasswordForm({ notice }: { notice: string }) {
   }
 
   return (
-    <form method="post" onSubmit={(event) => void submit(event)} noValidate className="max-w-md">
+    <form action={action} method="post" noValidate className="max-w-md">
       <h1 className="font-serif text-[clamp(2.5rem,5vw,3.5rem)] leading-none font-normal tracking-[-0.8px]">
         Forgot password
       </h1>
@@ -66,13 +42,12 @@ export function ForgotPasswordForm({ notice }: { notice: string }) {
           type="email"
           name="email"
           autoComplete="email"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
+          required
         />
       </label>
-      {fieldError ? (
+      {state.fieldErrors?.email ? (
         <p className="mt-3 text-sm text-warn" role="alert">
-          {fieldError}
+          {state.fieldErrors.email}
         </p>
       ) : null}
       <button
