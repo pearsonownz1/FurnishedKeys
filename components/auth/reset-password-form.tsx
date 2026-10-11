@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { useHydrated } from "@/components/auth/use-hydrated";
 import { dashboardForRole } from "@/lib/auth-redirect";
@@ -11,7 +10,6 @@ const fieldClass =
   "h-[46px] w-full rounded-[2px] border border-line bg-surface px-3 text-[15px]";
 
 export function ResetPasswordForm({ hasSession }: { hasSession: boolean }) {
-  const router = useRouter();
   const hydrated = useHydrated();
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -61,7 +59,7 @@ export function ResetPasswordForm({ hasSession }: { hasSession: boolean }) {
       const profile = data.user
         ? await supabase.from("profiles").select("role").eq("id", data.user.id).maybeSingle()
         : null;
-      router.push(dashboardForRole(profile?.data?.role));
+      window.location.assign(dashboardForRole(profile?.data?.role));
     } catch (caught) {
       console.error("reset-password", caught);
       setError("We couldn't update the password. Request a new link.");

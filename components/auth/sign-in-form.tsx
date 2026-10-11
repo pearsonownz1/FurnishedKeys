@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { useHydrated } from "@/components/auth/use-hydrated";
 import { dashboardForRole } from "@/lib/auth-redirect";
@@ -11,7 +10,6 @@ const fieldClass =
   "h-[46px] w-full rounded-[2px] border border-line bg-surface px-3 text-[15px]";
 
 export function SignInForm({ next, notice }: { next: string | null; notice: string }) {
-  const router = useRouter();
   const hydrated = useHydrated();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -39,12 +37,10 @@ export function SignInForm({ next, notice }: { next: string | null; notice: stri
         setPending(false);
         return;
       }
-      if (next) {
-        router.push(next);
-        return;
-      }
-      const profile = await supabase.from("profiles").select("role").eq("id", data.user.id).maybeSingle();
-      router.push(dashboardForRole(profile.data?.role));
+      const profile = next
+        ? null
+        : await supabase.from("profiles").select("role").eq("id", data.user.id).maybeSingle();
+      window.location.assign(next ?? dashboardForRole(profile?.data?.role));
     } catch (error) {
       console.error("sign-in", error);
       setFieldError("Wrong email or password");
