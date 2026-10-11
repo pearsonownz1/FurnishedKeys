@@ -6,6 +6,7 @@ import { submitInquiry } from "@/app/(site)/rentals/actions";
 import { loadOwnerListing, loadRole, loadSetupState, sessionUser } from "@/lib/api/owner-listing";
 import {
   DEFAULT_LEADS_NOTIFY_TO,
+  deliverInquiryDecline,
   deliverInquiryNotice,
   deliverInquiryReply,
   deliverRenterMessageNotice,
@@ -61,9 +62,16 @@ function form(extra?: { pets?: string }) {
   return data;
 }
 
-function serviceWithOwner(email: string | null) {
+function serviceWithOwner(
+  email: string | null,
+  flags?: {
+    notify_new_inquiry?: boolean;
+    notify_new_message?: boolean;
+    notify_listing_status?: boolean;
+  },
+) {
   const maybeSingle = vi.fn().mockResolvedValue({
-    data: email ? { email } : null,
+    data: email ? { email, ...flags } : null,
     error: null,
   });
   const eq = vi.fn().mockReturnValue({ maybeSingle });
@@ -281,9 +289,9 @@ describe("deliverInquiryNotice", () => {
     error.mockRestore();
   });
 
-  it("skips the owner when notify_email is false", async () => {
+  it("skips the owner when notify_new_inquiry is false", async () => {
     const maybeSingle = vi.fn().mockResolvedValue({
-      data: { email: "owner@example.com", notify_email: false },
+      data: { email: "owner@example.com", notify_new_inquiry: false },
       error: null,
     });
     vi.mocked(createServiceClient).mockReturnValue({
@@ -306,7 +314,7 @@ describe("deliverInquiryNotice", () => {
       message: "Hello",
     });
 
-    expect(result).toEqual({ id: null, detail: "skipped:notify-email" });
+    expect(result).toEqual({ id: null, detail: "skipped:notify-new-inquiry" });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
@@ -533,6 +541,32 @@ describe("POST /api/admin/listings/[id]/review emails", () => {
 });
 
 describe("deliverReviewDecision", () => {
+  it("skips approved and rejected mail when notify_listing_status is false", async () => {
+    serviceWithOwner("owner@example.com", { notify_listing_status: false });
+    vi.stubEnv("RESEND_API_KEY", "re_test_key");
+    vi.stubEnv("EMAIL_FROM", "Furnished Keys <hello@furnishedkeys.com>");
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await deliverReviewDecision({
+      ownerId,
+      listingTitle: "Pine ADU",
+      decision: "approved",
+      note: null,
+      origin: "https://furnishedkeys.com",
+    });
+    await deliverReviewDecision({
+      ownerId,
+      listingTitle: "Pine ADU",
+      decision: "rejected",
+      note: "Not a fit.",
+      origin: "https://furnishedkeys.com",
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("does not throw when sending fails", async () => {
     serviceWithOwner("owner@example.com");
     vi.stubEnv("RESEND_API_KEY", "re_test_key");
@@ -553,7 +587,7 @@ describe("deliverReviewDecision", () => {
 });
 
 describe("deliverRenterMessageNotice", () => {
-  it("emails the owner with a thread button and skips when notify_email is false", async () => {
+  it("emails the owner with a thread button and skips when notify_new_message is false", async () => {
     vi.stubEnv("RESEND_API_KEY", "re_test_key");
     vi.stubEnv("EMAIL_FROM", "Furnished Keys <hello@furnishedkeys.com>");
     serviceWithOwner("delivered+owner@resend.dev");
@@ -579,7 +613,7 @@ describe("deliverRenterMessageNotice", () => {
         select: () => ({
           eq: () => ({
             maybeSingle: vi.fn().mockResolvedValue({
-              data: { email: "delivered+owner@resend.dev", notify_email: false },
+              data: { email: "delivered+owner@resend.dev", notify_new_message: false },
               error: null,
             }),
           }),
@@ -591,7 +625,7 @@ describe("deliverRenterMessageNotice", () => {
       listingTitle: "Pine ADU",
       inquiryId,
     });
-    expect(skipped).toEqual({ id: null, detail: "skipped:notify-email" });
+    expect(skipped).toEqual({ id: null, detail: "skipped:notify-new-message" });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
@@ -622,6 +656,32 @@ describe("deliverInquiryReply", () => {
     expect(body.reply_to).toBe("delivered+owner@resend.dev");
     expect(body.html).toContain("Yes.<br>&lt;script&gt;");
     expect(body.html).toContain("https://furnishedkeys.com/inquiry/raw-token");
+    expect(body.html).not.toContain("<script>");
+  });
+});
+
+describe("deliverInquiryDecline", () => {
+  it("emails a short decline and escapes the optional note", async () => {
+    vi.stubEnv("RESEND_API_KEY", "re_test_key");
+    vi.stubEnv("EMAIL_FROM", "Furnished Keys <hello@furnishedkeys.com>");
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: "re_decline" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    vi.spyOn(console, "info").mockImplementation(() => {});
+
+    const result = await deliverInquiryDecline({
+      to: "delivered+renter@resend.dev",
+      listingTitle: "Pine ADU",
+      note: "Taken.\n<script>",
+    });
+
+    expect(result).toEqual({ id: "re_decline", detail: "sent:re_decline" });
+    const body = JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body));
+    expect(body.subject).toBe("About your inquiry for Pine ADU");
+    expect(body.html).toContain("not able to offer this stay");
+    expect(body.html).toContain("Taken.<br>&lt;script&gt;");
     expect(body.html).not.toContain("<script>");
   });
 });

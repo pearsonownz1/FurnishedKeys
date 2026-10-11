@@ -1,9 +1,12 @@
 import { expandRanges } from "@/lib/calendar-ranges";
 import type { ListingStatus } from "@/lib/db/types";
-import { isListingStep, type ListingStepId } from "@/lib/listing-draft";
+import { isListingStep, listingSteps, type ListingStepId } from "@/lib/listing-draft";
 import { missingSubmitFields, type CompletenessInput } from "@/lib/listings/access";
 
 export const REQUIRED_LISTING_FIELDS = 8;
+
+/** Filter tabs: Drafts, In review, Live. All is the unfiltered list. */
+export type ListingStatusGroup = "draft" | "review" | "live";
 
 export type OwnerListingCard = {
   id: string;
@@ -12,10 +15,48 @@ export type OwnerListingCard = {
   cover_url: string | null;
   city: string | null;
   setup_step: ListingStepId | null;
+  /** 1-based index of the resume step. Basics is 1. */
+  step_index: number;
+  /** Length of the wizard. Currently 10. */
+  step_count: number;
+  /** Label of the resume step, for "Step 2 of 10 · Rooms next". */
+  next_step_label: string;
+  status_group: ListingStatusGroup;
   percent_complete: number;
   resume_href: string;
   updated_at: string;
 };
+
+/**
+ * Resume step for the listing card.
+ * `step_index` is 1-based. `next_step_label` is that step's label, not the one after it.
+ * A null or unknown `setup_step` resumes at Basics.
+ * Card copy: `Step ${step_index} of ${step_count} · ${next_step_label} next`.
+ */
+export function listingStepProgress(setupStep: string | null): {
+  step_index: number;
+  step_count: number;
+  next_step_label: string;
+} {
+  const id = isListingStep(setupStep ?? undefined) ? setupStep : "basics";
+  const index = listingSteps.findIndex((step) => step.id === id);
+  const step = listingSteps[index] ?? listingSteps[0];
+  return {
+    step_index: index >= 0 ? index + 1 : 1,
+    step_count: listingSteps.length,
+    next_step_label: step.label,
+  };
+}
+
+/**
+ * Drafts: draft, rejected, changes_requested, archived.
+ * In review: pending_review. Live: approved.
+ */
+export function listingStatusGroup(status: ListingStatus): ListingStatusGroup {
+  if (status === "approved") return "live";
+  if (status === "pending_review") return "review";
+  return "draft";
+}
 
 export function percentComplete(missingCount: number): number {
   const present = Math.min(REQUIRED_LISTING_FIELDS, Math.max(0, REQUIRED_LISTING_FIELDS - missingCount));

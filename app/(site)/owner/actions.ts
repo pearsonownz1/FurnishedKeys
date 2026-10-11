@@ -1,10 +1,12 @@
 "use server";
 
 import { sessionUser } from "@/lib/api/owner-listing";
-import { deliverInquiryReply, publicOrigin } from "@/lib/email";
+import { deliverInquiryDecline, deliverInquiryReply, publicOrigin } from "@/lib/email";
 import {
   REPLY_MISSING,
   REPLY_SIGN_IN,
+  declineFormError,
+  declineSchema,
   replyFormError,
   replySchema,
   type ReplyActionState,
@@ -78,16 +80,25 @@ export async function replyToInquiry(
     return { ok: false, formError: SEND_FAILURE };
   }
 
-  const inserted = await supabase.from("messages").insert({
-    inquiry_id: inquiryId,
-    sender_id: user.id,
-    sender_role: "owner",
-    body,
-  });
-  if (inserted.error) {
-    console.error("inquiry reply insert failed", inserted.error.code ?? "error", inserted.error.message);
+  const inserted = await supabase
+    .from("messages")
+    .insert({
+      inquiry_id: inquiryId,
+      sender_id: user.id,
+      sender_role: "owner",
+      body,
+    })
+    .select("id")
+    .single();
+  if (inserted.error || !inserted.data) {
+    console.error(
+      "inquiry reply insert failed",
+      inserted.error?.code ?? "error",
+      inserted.error?.message ?? "no row",
+    );
     return { ok: false, formError: SEND_FAILURE };
   }
+  const messageId = inserted.data.id;
 
   const updated = await supabase
     .from("inquiries")
@@ -123,16 +134,92 @@ export async function replyToInquiry(
       console.error("inquiry reply email skipped: owner has no email");
     } else {
       const origin = await publicOrigin();
-      await deliverInquiryReply({
+      const mailed = await deliverInquiryReply({
         to: loaded.data.email,
         listingTitle: listing.data?.title?.trim() || "your home",
         body,
         replyTo: ownerEmail,
         inquiryUrl: `${origin}/inquiry/${token.raw}`,
       });
+      if (mailed.id) {
+        const flagged = await service.from("messages").update({ emailed: true }).eq("id", messageId);
+        if (flagged.error) {
+          console.error("message emailed flag failed", flagged.error.message);
+        }
+      }
     }
   } catch (error) {
     console.error("inquiry reply email failed", error instanceof Error ? error.message : "error");
+  }
+
+  return { ok: true, success: true };
+}
+
+/**
+ * Owner decline. Sets status to `declined` and emails the renter.
+ * The thread stays in the inbox with that status.
+ *
+ * `declineInquiry(previousState, formData)`
+ * formData: `inquiryId` (uuid), optional `note` (trimmed, at most 2000 characters).
+ */
+export async function declineInquiry(
+  _previous: ReplyActionState,
+  formData: FormData,
+): Promise<ReplyActionState> {
+  const { supabase, user } = await sessionUser();
+  if (!user) return { ok: false, formError: REPLY_SIGN_IN };
+
+  const rawNote = formData.get("note");
+  const parsed = declineSchema.safeParse({
+    inquiryId: String(formData.get("inquiryId") ?? ""),
+    note: rawNote == null ? undefined : String(rawNote),
+  });
+  if (!parsed.success) return { ok: false, formError: declineFormError(parsed.error) };
+
+  const { inquiryId, note } = parsed.data;
+  const loaded = await supabase
+    .from("inquiries")
+    .select("id, email, listing_id")
+    .eq("id", inquiryId)
+    .maybeSingle();
+  if (loaded.error) {
+    console.error("inquiry decline load failed", loaded.error.message);
+    return { ok: false, formError: SEND_FAILURE };
+  }
+  if (!loaded.data) return { ok: false, formError: REPLY_MISSING };
+
+  const listing = await supabase
+    .from("listings")
+    .select("title, owner_id")
+    .eq("id", loaded.data.listing_id)
+    .maybeSingle();
+  if (listing.error) {
+    console.error("inquiry decline listing failed", listing.error.message);
+    return { ok: false, formError: SEND_FAILURE };
+  }
+  if (!listing.data || listing.data.owner_id !== user.id) {
+    return { ok: false, formError: REPLY_MISSING };
+  }
+
+  const updated = await supabase
+    .from("inquiries")
+    .update({ status: "declined" })
+    .eq("id", inquiryId)
+    .select("id");
+  if (updated.error) {
+    console.error("inquiry decline status failed", updated.error.message);
+    return { ok: false, formError: SEND_FAILURE };
+  }
+  if (!updated.data?.length) return { ok: false, formError: REPLY_MISSING };
+
+  try {
+    await deliverInquiryDecline({
+      to: loaded.data.email,
+      listingTitle: listing.data.title?.trim() || "your home",
+      note: note?.trim() ? note.trim() : null,
+    });
+  } catch (error) {
+    console.error("inquiry decline email failed", error instanceof Error ? error.message : "error");
   }
 
   return { ok: true, success: true };
