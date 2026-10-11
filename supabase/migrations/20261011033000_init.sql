@@ -1245,7 +1245,8 @@ begin
   end if;
 end $$;
 
-alter table storage.objects enable row level security;
+-- Supabase owns storage.objects and storage.buckets and already enables RLS.
+-- Do not ALTER those tables (owner or row level security); that fails on a fresh project.
 
 drop policy if exists listing_photos_read on storage.objects;
 create policy listing_photos_read
