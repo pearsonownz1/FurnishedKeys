@@ -31,6 +31,9 @@ export type BrowseView = "list" | "split" | "map";
 export type ListingQuery = {
   where?: string;
   moveIn?: string;
+  moveOut?: string;
+  /** Open-ended stay. Move-out is ignored while this is set. */
+  flexible?: boolean;
   stayMonths?: number;
   budgetCents?: number;
   view?: BrowseView;
@@ -78,12 +81,62 @@ function firstParam(value: string | string[] | undefined): string | undefined {
   return trimmed ? trimmed : undefined;
 }
 
+const isoDatePattern = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/** True for a real calendar day, written YYYY-MM-DD. */
+export function isIsoDate(value: string): boolean {
+  const match = isoDatePattern.exec(value);
+  if (!match) return false;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  );
+}
+
+export function todayIso(now = new Date()): string {
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${now.getFullYear()}-${month}-${day}`;
+}
+
+/**
+ * Earliest selectable day. Today is the default floor; `floor` (for example
+ * the chosen move-in) can only move that later.
+ */
+export function calendarMin(today: string | null, floor?: string): string | null {
+  const dates = [today, floor].filter((value): value is string =>
+    Boolean(value && isIsoDate(value)),
+  );
+  if (dates.length === 0) return null;
+  return dates.reduce((later, value) => (value > later ? value : later));
+}
+
+/** Clear move-out when move-in moves to a day after it. */
+export function moveOutAfterMoveInChange(moveIn: string, moveOut: string): string {
+  if (moveIn && moveOut && moveIn > moveOut) return "";
+  return moveOut;
+}
+
+function isoParam(value: string | undefined): string | undefined {
+  return value && isIsoDate(value) ? value : undefined;
+}
+
 export function parseListingQuery(
   raw: Record<string, string | string[] | undefined>,
 ): ListingQuery {
-  const stay = Number(firstParam(raw.stay_months));
+  const stay = Number(firstParam(raw.stay) ?? firstParam(raw.stay_months));
   const budget = Number(firstParam(raw.budget_cents));
-  const moveIn = firstParam(raw.move_in);
+  const moveIn =
+    isoParam(firstParam(raw.moveIn)) ??
+    isoParam(firstParam(raw.move_in)) ??
+    isoParam(firstParam(raw["move-in"]));
+  const explicitMoveOut = isoParam(firstParam(raw.moveOut));
+  const flexible = firstParam(raw.flexible) === "1";
   const minStay = Number(firstParam(raw.min_stay));
   const beds = firstParam(raw.beds);
   const type = firstParam(raw.type);
@@ -92,10 +145,19 @@ export function parseListingQuery(
   const propertyTypes = ["adu", "apartment", "room", "house", "other"] as const;
   const views = ["list", "split", "map"] as const;
   const query: ListingQuery = {};
+  const stayMonths = Number.isFinite(stay) && stay > 0 ? stay : undefined;
+
+  let moveOut = explicitMoveOut;
+  if (!moveOut && !flexible && moveIn && stayMonths) {
+    moveOut = addMonths(moveIn, stayMonths);
+  }
+  if (flexible || (moveOut && moveIn && moveOut <= moveIn)) moveOut = undefined;
 
   if (where) query.where = where;
-  if (moveIn && /^\d{4}-\d{2}-\d{2}$/.test(moveIn)) query.moveIn = moveIn;
-  if (Number.isFinite(stay) && stay > 0) query.stayMonths = stay;
+  if (moveIn) query.moveIn = moveIn;
+  if (moveOut) query.moveOut = moveOut;
+  if (flexible) query.flexible = true;
+  if (stayMonths) query.stayMonths = stayMonths;
   if (Number.isFinite(budget) && budget > 0) query.budgetCents = budget;
   const parsedView = views.find((item) => item === view);
   if (parsedView) query.view = parsedView;
@@ -112,7 +174,9 @@ export function parseListingQuery(
 export function listingQueryString(query: ListingQuery): string {
   const params = new URLSearchParams();
   if (query.where) params.set("where", query.where);
-  if (query.moveIn) params.set("move_in", query.moveIn);
+  if (query.moveIn) params.set("moveIn", query.moveIn);
+  if (query.flexible) params.set("flexible", "1");
+  else if (query.moveOut) params.set("moveOut", query.moveOut);
   if (query.stayMonths) params.set("stay_months", String(query.stayMonths));
   if (query.budgetCents) params.set("budget_cents", String(query.budgetCents));
   if (query.type) params.set("type", query.type);
@@ -121,6 +185,16 @@ export function listingQueryString(query: ListingQuery): string {
   if (query.pets) params.set("pets", "1");
   if (query.minStay) params.set("min_stay", String(query.minStay));
   if (query.view) params.set("view", query.view);
+  const value = params.toString();
+  return value ? `?${value}` : "";
+}
+
+/** Date params carried onto a listing so the inquiry form can pre-fill. */
+export function stayLinkQuery(query: ListingQuery): string {
+  const params = new URLSearchParams();
+  if (query.moveIn) params.set("moveIn", query.moveIn);
+  if (query.flexible) params.set("flexible", "1");
+  else if (query.moveOut) params.set("moveOut", query.moveOut);
   const value = params.toString();
   return value ? `?${value}` : "";
 }

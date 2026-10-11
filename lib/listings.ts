@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { expandRanges } from "@/lib/calendar-ranges";
 import {
   listingPublicColumns,
   type AvailabilityWindow,
@@ -15,6 +16,7 @@ import {
 } from "@/lib/db/types";
 import { fixtureListings } from "@/lib/listing-fixtures";
 import { formatCents } from "@/lib/money";
+import { stayHitsBlocked } from "@/lib/owner-dashboard";
 import type { ListingQuery } from "@/lib/search";
 import { createPublicClient } from "@/lib/supabase/public";
 
@@ -250,6 +252,20 @@ export function filterListings(
         return true;
       });
       if (!open) return false;
+    }
+
+    if (
+      query.moveIn &&
+      query.moveOut &&
+      !query.flexible &&
+      listing.blocked_dates.length > 0 &&
+      stayHitsBlocked(
+        query.moveIn,
+        query.moveOut,
+        expandRanges(listing.blocked_dates),
+      )
+    ) {
+      return false;
     }
 
     if (query.type && listing.property_type !== query.type) return false;

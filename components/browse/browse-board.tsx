@@ -19,6 +19,7 @@ export function BrowseBoard({
   view,
   catalogError,
   placeCenter = null,
+  staySearch = "",
 }: {
   items: BrowseItem[];
   title: string;
@@ -26,6 +27,7 @@ export function BrowseBoard({
   view: BrowseView;
   catalogError: boolean;
   placeCenter?: { lat: number; lng: number } | null;
+  staySearch?: string;
 }) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const activeId =
@@ -73,6 +75,7 @@ export function BrowseBoard({
                 item={item}
                 active={item.id === activeId}
                 onActive={setHoveredId}
+                search={staySearch}
               />
             ))}
           </div>
@@ -85,7 +88,13 @@ export function BrowseBoard({
             : "hidden lg:block lg:h-full lg:border-l lg:border-line"
         }
       >
-        <AreaMap points={points} activeId={activeId} onActive={setHoveredId} center={center} />
+        <AreaMap
+          points={points}
+          activeId={activeId}
+          onActive={setHoveredId}
+          center={center}
+          listingSearch={staySearch}
+        />
       </div>
     </div>
   );

@@ -23,15 +23,17 @@ export function ListingRow({
   item,
   active,
   onActive,
+  search = "",
 }: {
   item: BrowseItem;
   active: boolean;
   onActive: (id: string) => void;
+  search?: string;
 }) {
   return (
     <article className="border-t border-line py-4">
       <Link
-        href={`/rentals/${item.slug}`}
+        href={`/rentals/${item.slug}${search}`}
         onMouseEnter={() => onActive(item.id)}
         onFocus={() => onActive(item.id)}
         className="grid grid-cols-[112px_1fr] gap-3 sm:grid-cols-[200px_1fr] sm:gap-5 lg:grid-cols-[260px_1fr]"

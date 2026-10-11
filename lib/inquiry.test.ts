@@ -48,6 +48,19 @@ describe("validateInquiry", () => {
     }
   });
 
+  it("accepts an open-ended stay and stores move-out as null", () => {
+    const input = { ...base, moveOut: "", flexible: true };
+    expect(validateInquiry(input, constraints).ok).toBe(true);
+    expect(toInquiryInsert(input).move_out).toBeNull();
+    expect(toInquiryInsert(input)).not.toHaveProperty("flexible");
+  });
+
+  it("still requires a move-out when the renter did not mark the stay open-ended", () => {
+    const result = validateInquiry({ ...base, moveOut: "" }, constraints);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.fieldErrors.moveOut).toMatch(/move-out/i);
+  });
+
   it("rejects a stay that overlaps a blocked day", () => {
     const result = validateInquiry(base, {
       ...constraints,

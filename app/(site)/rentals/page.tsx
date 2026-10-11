@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { BrowseBoard } from "@/components/browse/browse-board";
 import type { BrowseItem } from "@/components/browse/listing-row";
 import { FilterBar } from "@/components/browse/filter-bar";
+import { SearchBar } from "@/components/search-bar";
 import {
   allInLine,
   bedsAndSleeps,
@@ -18,7 +19,7 @@ import { loadWhereLocations } from "@/lib/locations-load";
 import { formatCents } from "@/lib/money";
 import { signedPhotoUrls } from "@/lib/photos";
 import { canonical } from "@/lib/site";
-import { moveInOptions, parseListingQuery, type BrowseView } from "@/lib/search";
+import { parseListingQuery, stayLinkQuery, type BrowseView } from "@/lib/search";
 
 type Search = Record<string, string | string[] | undefined>;
 
@@ -92,14 +93,21 @@ async function RentalsResults({
     ? "Catalog unavailable"
     : `${items.length} ${allDemo ? demoNoun : noun} · Sorted by recently confirmed`;
 
+  const staySearch = stayLinkQuery(query);
+  const searchKey = [
+    query.where ?? "",
+    query.moveIn ?? "",
+    query.moveOut ?? "",
+    query.flexible ? "1" : "",
+    query.budgetCents ?? "",
+  ].join(":");
+
   return (
     <div className="lg:flex lg:h-[calc(100dvh-4rem)] lg:flex-col">
-      <FilterBar
-        key={summary + view + (query.where ?? "")}
-        query={query}
-        moveIns={moveInOptions(new Date())}
-        places={places}
-      />
+      <div className="border-b border-line bg-bg px-5 py-4 md:px-8">
+        <SearchBar key={searchKey} initial={query} places={places} />
+      </div>
+      <FilterBar key={summary + view + searchKey} query={query} places={places} />
       <div className="lg:min-h-0 lg:flex-1">
         <BrowseBoard
           items={items}
@@ -107,6 +115,7 @@ async function RentalsResults({
           summary={summary}
           view={view}
           catalogError={catalogError}
+          staySearch={staySearch}
           placeCenter={
             place && place.lat !== null && place.lng !== null
               ? { lat: place.lat, lng: place.lng }
