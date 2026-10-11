@@ -22,7 +22,7 @@ export function requestedNext(value: string | null | undefined): string | null {
   return `${url.pathname}${url.search}${url.hash}`;
 }
 
-/** Admins land in the review queue. Every other signed-in role lands on their listings. */
+/** Admins land on the admin overview. Every other signed-in role lands on their listings. */
 export function dashboardForRole(role: string | null | undefined): string {
-  return role === "admin" ? "/admin/listings" : "/owner";
+  return role === "admin" ? "/admin" : "/owner";
 }

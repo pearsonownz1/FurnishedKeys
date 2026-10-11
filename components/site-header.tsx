@@ -54,7 +54,7 @@ export function SiteHeader({
     ? "cursor-pointer rounded-[2px] border border-white/70 px-3 py-2 text-sm"
     : "cursor-pointer rounded-[2px] border border-line bg-surface px-3 py-2 text-sm";
   const navLinks = signedIn ? links.filter((link) => link.href !== "/sign-in") : links;
-  const accountHref = role === "admin" ? "/admin/listings" : "/owner";
+  const accountHref = role === "admin" ? "/admin" : "/owner";
   const accountLabel = role === "admin" ? "Admin" : "My listings";
 
   return (
