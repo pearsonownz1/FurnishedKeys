@@ -19,9 +19,25 @@ const instrumentSerif = Instrument_Serif({
 });
 
 export const metadata: Metadata = {
-  title: brand.title,
+  metadataBase: new URL("https://furnishedkeys.com"),
+  title: {
+    default: brand.title,
+    template: "%s | Furnished Keys",
+  },
   description: brand.subline,
   applicationName: brand.name,
+  openGraph: {
+    title: brand.title,
+    description: brand.subline,
+    siteName: brand.name,
+    type: "website",
+    images: [
+      {
+        url: "/demo/hero.jpg",
+        alt: "Furnished living room with pines beyond the windows",
+      },
+    ],
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

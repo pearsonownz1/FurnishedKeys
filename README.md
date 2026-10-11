@@ -36,6 +36,12 @@ Copy `.env.example` for local work. Production values are set on the Vercel proj
 
 Markets come from `lib/locations.ts`, shaped like the `locations` table: `id`, `slug`, `name`, `region`, `state`, `country`, `active`, `sort`. The seed is Bend, then Deschutes County. Components read that module. Do not hard-code a city name in the UI.
 
+## Homepage
+
+The homepage is a full-bleed photo, a search bar, two paths, three demo listing cards, how monthly stays work, and an owner band. Search submits to `/rentals` with `where`, `move_in`, `stay_months`, and `budget_cents`.
+
+Listing cards read `lib/listings.ts`. Fixtures use the same columns as `listings`, `listing_fees`, `listing_photos`, and `availability_windows`, every one flagged `is_demo`. Rent is separate from each fee. “Availability confirmed” comes from `last_confirmed_at`. Photos in `public/demo/` are AI stand-ins for development only, served with `next/image`.
+
 ## Backend boundary
 
 Schema, RLS, generated types, and seeds belong to Backend:
