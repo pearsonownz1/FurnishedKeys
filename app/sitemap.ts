@@ -4,6 +4,11 @@ import { SITE_ORIGIN } from "@/lib/site";
 
 const staticPaths = ["/", "/rentals", "/owners", "/management", "/about"] as const;
 
+function isIndexable(url: string): boolean {
+  const pathname = new URL(url).pathname.replace(/\/$/, "") || "/";
+  return pathname !== "/letter";
+}
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   let listings: { slug: string; updated_at: string }[] = [];
   try {
@@ -20,5 +25,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       url: `${SITE_ORIGIN}/rentals/${listing.slug}`,
       lastModified: listing.updated_at,
     })),
-  ];
+  ].filter((entry) => isIndexable(entry.url));
 }

@@ -3,6 +3,20 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
+  async redirects() {
+    return [
+      {
+        source: "/letter",
+        destination: "/owners?src=letter",
+        permanent: false,
+      },
+      {
+        source: "/login",
+        destination: "/sign-in",
+        permanent: false,
+      },
+    ];
+  },
   images: {
     remotePatterns: [
       {

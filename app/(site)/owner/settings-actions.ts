@@ -1,6 +1,8 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { sessionUser } from "@/lib/api/owner-listing";
+import type { SavedProfileFields } from "@/lib/owner-dashboard";
 
 export type SettingsState = {
   ok: boolean;
@@ -11,6 +13,8 @@ export type SettingsState = {
   >;
   /** Set when an email change is waiting on the confirmation message. */
   message?: string;
+  /** Row read back after a successful profile save. */
+  profile?: SavedProfileFields;
 };
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -46,12 +50,26 @@ export async function saveProfile(
       notify_new_message: checked(formData.get("notify_new_message")),
       notify_listing_status: checked(formData.get("notify_listing_status")),
     })
-    .eq("id", user.id);
-  if (saved.error) {
-    console.error("profile save failed", saved.error.message);
+    .eq("id", user.id)
+    .select("full_name, phone, notify_new_inquiry, notify_new_message, notify_listing_status")
+    .maybeSingle();
+  if (saved.error || !saved.data) {
+    console.error("profile save failed", saved.error?.message ?? "no profile row");
     return { ok: false, formError: "We couldn't save your profile. Please try again." };
   }
-  return { ok: true, success: true };
+  revalidatePath("/owner/settings");
+  revalidatePath("/owner", "layout");
+  return {
+    ok: true,
+    success: true,
+    profile: {
+      full_name: saved.data.full_name ?? "",
+      phone: saved.data.phone ?? "",
+      notify_new_inquiry: saved.data.notify_new_inquiry !== false,
+      notify_new_message: saved.data.notify_new_message !== false,
+      notify_listing_status: saved.data.notify_listing_status !== false,
+    },
+  };
 }
 
 /** Asks Supabase to email a confirmation link. The address changes after that link is opened. */
