@@ -82,7 +82,7 @@ describe("sendEmail", () => {
       replyTo: "ada@example.com",
     });
 
-    expect(result).toEqual({ id: null });
+    expect(result).toEqual({ id: null, detail: "skipped:no-key" });
     expect(fetchMock).not.toHaveBeenCalled();
     expect(info).toHaveBeenCalledWith(
       "email skipped (no RESEND_API_KEY)",
@@ -113,7 +113,7 @@ describe("sendEmail", () => {
       replyTo: "ada@example.com",
     });
 
-    expect(result).toEqual({ id: "re_123" });
+    expect(result).toEqual({ id: "re_123", detail: "sent:re_123" });
     expect(fetchMock).toHaveBeenCalledWith(
       "https://api.resend.com/emails",
       expect.objectContaining({ method: "POST" }),
@@ -144,7 +144,7 @@ describe("sendEmail", () => {
 
     await expect(
       sendEmail({ to: "owner@example.com", subject: "Hi", html: "<p>Hi</p>" }),
-    ).resolves.toEqual({ id: null });
+    ).resolves.toEqual({ id: null, detail: "failed:422:domain not verified" });
     expect(error).toHaveBeenCalledWith("email failed", 422, "domain not verified");
     error.mockRestore();
   });
@@ -235,7 +235,7 @@ describe("deliverInquiryNotice", () => {
         pets: null,
         message: "Hello",
       }),
-    ).resolves.toBeUndefined();
+    ).resolves.toEqual({ id: null, detail: "skipped:no-service-client" });
     expect(error).toHaveBeenCalledWith("email skipped: service client is not configured");
     error.mockRestore();
   });

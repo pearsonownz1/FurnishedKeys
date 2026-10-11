@@ -1,5 +1,6 @@
 "use server";
 
+import { cookies } from "next/headers";
 import { deliverInquiryNotice } from "@/lib/email";
 import type { InquiryActionState } from "@/lib/inquiry";
 import { readInquiryForm, toInquiryInsert, validateInquiry } from "@/lib/inquiry";
@@ -39,7 +40,7 @@ export async function submitInquiry(
   }
 
   try {
-    await deliverInquiryNotice({
+    const sent = await deliverInquiryNotice({
       ownerId: listing.owner_id,
       listingTitle: listing.title,
       inquiryId,
@@ -51,6 +52,10 @@ export async function submitInquiry(
       pets: input.pets.trim() || null,
       message: input.message.trim(),
     });
+    if (process.env.VERCEL_ENV === "preview") {
+      const jar = await cookies();
+      jar.set("fk_email_result", sent.detail, { httpOnly: true, path: "/", maxAge: 180, sameSite: "lax" });
+    }
   } catch (emailError) {
     console.error(
       "inquiry email failed",

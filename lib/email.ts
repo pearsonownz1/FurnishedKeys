@@ -33,8 +33,10 @@ export type ReviewNotice = {
   origin: string;
 };
 
+export type SendResult = { id: string | null; detail: string };
+
 /** Sends through Resend. With no API key, logs the message and does not send. Never throws. */
-export async function sendEmail(message: OutboundEmail): Promise<{ id: string | null }> {
+export async function sendEmail(message: OutboundEmail): Promise<SendResult> {
   const apiKey = process.env.RESEND_API_KEY?.trim();
   if (!apiKey) {
     console.info("email skipped (no RESEND_API_KEY)", {
@@ -43,13 +45,13 @@ export async function sendEmail(message: OutboundEmail): Promise<{ id: string | 
       replyTo: message.replyTo ?? null,
       html: message.html,
     });
-    return { id: null };
+    return { id: null, detail: "skipped:no-key" };
   }
 
   const from = process.env.EMAIL_FROM?.trim();
   if (!from) {
     console.error("email skipped (no EMAIL_FROM)", { to: message.to, subject: message.subject });
-    return { id: null };
+    return { id: null, detail: "skipped:no-from" };
   }
 
   const payload: Record<string, unknown> = {
@@ -71,14 +73,16 @@ export async function sendEmail(message: OutboundEmail): Promise<{ id: string | 
     });
     const body = (await response.json().catch(() => null)) as { id?: string; message?: string } | null;
     if (!response.ok || !body?.id) {
-      console.error("email failed", response.status, body?.message ?? "no id");
-      return { id: null };
+      const reason = body?.message ?? "no id";
+      console.error("email failed", response.status, reason);
+      return { id: null, detail: `failed:${response.status}:${reason}`.slice(0, 180) };
     }
     console.info("email sent", body.id);
-    return { id: body.id };
+    return { id: body.id, detail: `sent:${body.id}` };
   } catch (error) {
-    console.error("email failed", error instanceof Error ? error.message : "request error");
-    return { id: null };
+    const reason = error instanceof Error ? error.message : "request error";
+    console.error("email failed", reason);
+    return { id: null, detail: `failed:${reason}`.slice(0, 180) };
   }
 }
 
@@ -126,28 +130,30 @@ export function reviewNoticeHtml(input: {
 }
 
 /** Looks up the owner and sends the inquiry notice. A failure is logged and swallowed. */
-export async function deliverInquiryNotice(notice: InquiryNotice): Promise<void> {
+export async function deliverInquiryNotice(notice: InquiryNotice): Promise<SendResult> {
   try {
-    const to = await ownerEmail(notice.ownerId);
-    if (!to) return;
+    const owner = await ownerEmail(notice.ownerId);
+    if (!owner.email) return { id: null, detail: owner.detail };
     const origin = await siteOrigin();
     const inquiryUrl = `${origin}/owner#inquiry-${notice.inquiryId}`;
-    await sendEmail({
-      to,
+    return await sendEmail({
+      to: owner.email,
       subject: `New inquiry for ${oneLine(notice.listingTitle)}`,
       html: inquiryNoticeHtml({ ...notice, inquiryUrl }),
       replyTo: notice.renterEmail,
     });
   } catch (error) {
-    console.error("inquiry email failed", error instanceof Error ? error.message : "error");
+    const reason = error instanceof Error ? error.message : "error";
+    console.error("inquiry email failed", reason);
+    return { id: null, detail: `failed:${reason}`.slice(0, 180) };
   }
 }
 
 /** Looks up the owner and sends the review decision. A failure is logged and swallowed. */
 export async function deliverReviewDecision(notice: ReviewNotice): Promise<void> {
   try {
-    const to = await ownerEmail(notice.ownerId);
-    if (!to) return;
+    const owner = await ownerEmail(notice.ownerId);
+    if (!owner.email) return;
     const title = oneLine(notice.listingTitle);
     const subject =
       notice.decision === "approved"
@@ -157,7 +163,7 @@ export async function deliverReviewDecision(notice: ReviewNotice): Promise<void>
           : `Listing not approved: ${title}`;
     const origin = notice.origin.replace(/\/$/, "");
     await sendEmail({
-      to,
+      to: owner.email,
       subject,
       html: reviewNoticeHtml({
         listingTitle: notice.listingTitle,
@@ -171,11 +177,11 @@ export async function deliverReviewDecision(notice: ReviewNotice): Promise<void>
   }
 }
 
-async function ownerEmail(ownerId: string): Promise<string | null> {
+async function ownerEmail(ownerId: string): Promise<{ email: string | null; detail: string }> {
   const service = createServiceClient();
   if (!service) {
     console.error("email skipped: service client is not configured");
-    return null;
+    return { email: null, detail: "skipped:no-service-client" };
   }
   const { data, error } = await service
     .from("profiles")
@@ -184,13 +190,13 @@ async function ownerEmail(ownerId: string): Promise<string | null> {
     .maybeSingle();
   if (error) {
     console.error("email skipped: owner lookup failed", error.message);
-    return null;
+    return { email: null, detail: `skipped:lookup:${error.message}`.slice(0, 180) };
   }
   if (!data?.email) {
     console.error("email skipped: owner has no email");
-    return null;
+    return { email: null, detail: "skipped:no-owner-email" };
   }
-  return data.email;
+  return { email: data.email, detail: "ok" };
 }
 
 async function siteOrigin(): Promise<string> {
