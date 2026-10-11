@@ -15,10 +15,17 @@ export default function ManagementPage() {
       </h1>
       <p className="mt-5 max-w-xl text-[17px] leading-relaxed text-muted">
         Hand off the work, from inquiries and showings to move-in. We handle
-        renters and upkeep. Consultation requests are not open yet, and this
-        page does not quote a management price.
+        renters and upkeep. This page does not quote a management price.
       </p>
-      <p className="mt-8 text-[15px]">
+      <p className="mt-8">
+        <Link
+          href="/owners"
+          className="inline-block rounded-[2px] bg-pine px-5 py-3.5 font-semibold text-white"
+        >
+          Request an assessment
+        </Link>
+      </p>
+      <p className="mt-6 text-[15px]">
         <Link href="/list" className="font-semibold text-pine">
           Or list it yourself
         </Link>
