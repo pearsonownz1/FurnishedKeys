@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { connection } from "next/server";
+import { redirect } from "next/navigation";
 import { Suspense } from "react";
-import { ListingWizard } from "@/components/listing/listing-wizard";
 import { loadListingEditor } from "@/lib/listing-editor-load";
-import { stepFromQuery } from "@/lib/listing-draft";
-import { primaryLocation } from "@/lib/locations";
+import { isListingStep } from "@/lib/listing-draft";
+import { feeCoversListing } from "@/lib/listings/access";
 
 type Search = Record<string, string | string[] | undefined>;
 
@@ -32,9 +32,16 @@ async function Editor({
   await connection();
   const { id } = await params;
   const query = await searchParams;
-  const raw = query.step;
   const loaded = await loadListingEditor(id);
-  if (!loaded) {
+  if (loaded.status === "error") {
+    return (
+      <div className="shell py-16">
+        <h1 className="font-serif text-4xl font-normal">We couldn&apos;t load this draft.</h1>
+        <p className="mt-4 text-sm text-muted">Please try again.</p>
+      </div>
+    );
+  }
+  if (loaded.status !== "ready") {
     return (
       <div className="shell py-16">
         <h1 className="font-serif text-4xl font-normal">Sign in to edit this listing</h1>
@@ -46,12 +53,16 @@ async function Editor({
     );
   }
 
-  return (
-    <ListingWizard
-      listingId={id}
-      locationId={primaryLocation().id}
-      initial={loaded.draft}
-      initialStep={stepFromQuery(Array.isArray(raw) ? raw[0] : raw)}
-    />
+  const raw = query.step;
+  const step = Array.isArray(raw) ? raw[0] : raw;
+  const covered = feeCoversListing(
+    {
+      listing_fee_status: loaded.listing.feeStatus,
+      fee_paid_through: loaded.listing.paidThrough,
+    },
+    new Date(),
   );
+  if (!covered) redirect(`/owners/listings/${id}/plan`);
+  const suffix = isListingStep(step) ? `?step=${step}` : "";
+  redirect(`/owners/listings/${id}/setup${suffix}`);
 }

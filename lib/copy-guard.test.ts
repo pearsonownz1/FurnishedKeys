@@ -20,11 +20,10 @@ describe("copy guard", () => {
     expect(hits).toEqual([]);
   });
 
-  it("does not mention a refund except the decided review line", () => {
-    const allowed = "If we can't approve it, you get a full refund.";
+  it("does not mention a refund", () => {
     const files = [...walk("app"), ...walk("components")];
     const hits = files.flatMap((file) => {
-      const source = readFileSync(file, "utf8").replaceAll(allowed, "");
+      const source = readFileSync(file, "utf8");
       return /refund/i.test(source) ? [file] : [];
     });
     expect(hits).toEqual([]);

@@ -38,3 +38,51 @@ export async function saveListingFees(
   if (inserted.error) return { ok: false, error: inserted.error.message };
   return { ok: true };
 }
+
+async function ownerListing(listingId: string) {
+  const { supabase, user } = await sessionUser();
+  const listing = await loadOwnerListing(supabase, listingId);
+  if (!listing || !user || listing.owner_id !== user.id) return null;
+  return { supabase, listing };
+}
+
+export async function reorderListingPhotos(
+  listingId: string,
+  paths: string[],
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const owner = await ownerListing(listingId);
+  if (!owner) return { ok: false, error: "Sign in required" };
+  for (let index = 0; index < paths.length; index += 1) {
+    const path = paths[index];
+    if (!path) continue;
+    const updated = await owner.supabase
+      .from("listing_photos")
+      .update({ sort: index })
+      .eq("listing_id", listingId)
+      .eq("storage_path", path);
+    if (updated.error) return { ok: false, error: updated.error.message };
+  }
+  return { ok: true };
+}
+
+/** One cover. The previous cover is cleared first so the unique index can accept the new one. */
+export async function setListingCover(
+  listingId: string,
+  photoId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const owner = await ownerListing(listingId);
+  if (!owner) return { ok: false, error: "Sign in required" };
+  const cleared = await owner.supabase
+    .from("listing_photos")
+    .update({ is_cover: false })
+    .eq("listing_id", listingId)
+    .eq("is_cover", true);
+  if (cleared.error) return { ok: false, error: cleared.error.message };
+  const marked = await owner.supabase
+    .from("listing_photos")
+    .update({ is_cover: true })
+    .eq("listing_id", listingId)
+    .eq("id", photoId);
+  if (marked.error) return { ok: false, error: marked.error.message };
+  return { ok: true };
+}

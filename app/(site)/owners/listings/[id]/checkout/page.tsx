@@ -18,7 +18,10 @@ async function Checkout({ params }: { params: Promise<{ id: string }> }) {
 
   return (
     <div className="shell py-12 lg:py-16">
-      <CheckoutPanel listingId={id} title={loaded?.title ?? "Your listing"} />
+      <CheckoutPanel
+        listingId={id}
+        title={loaded.status === "ready" ? loaded.listing.title : "Your listing"}
+      />
     </div>
   );
 }

@@ -45,11 +45,17 @@ describe("checkout response", () => {
     expect(paidThroughMonthYear("2027-10-11T00:00:00.000Z")).toBe("Paid through Oct 2027");
   });
 
-  it("does not choose the checkout screen from an environment flag", () => {
+  it("sends Process payment to setup on a waiver and mounts embedded checkout for a client secret", () => {
     const source = readFileSync("components/listing/checkout-panel.tsx", "utf8");
     expect(source).toContain("parseCheckoutPost");
     expect(source).toContain("Process payment");
+    expect(source).toContain("Renew automatically each year");
+    expect(source).toContain("paid_through");
+    expect(source).toContain("StripeEmbed");
+    expect(source).toContain("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY");
+    expect(source).toContain("Payments are being set up");
     expect(source).not.toContain("Payments coming soon");
-    expect(source).not.toMatch(/process\.env/);
+    expect(source).not.toMatch(/refund/i);
+    expect(source).not.toContain("STRIPE_SECRET_KEY");
   });
 });

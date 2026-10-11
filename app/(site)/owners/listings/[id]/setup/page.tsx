@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense } from "react";
-import { SetupReceipt } from "@/components/listing/setup-receipt";
+import { ListingSetup } from "@/components/listing/listing-setup";
+import { paidThroughMonthYear } from "@/lib/checkout";
 import { loadListingEditor } from "@/lib/listing-editor-load";
+import { stepFromQuery } from "@/lib/listing-draft";
 
 type Search = Record<string, string | string[] | undefined>;
 
@@ -30,10 +32,16 @@ async function Setup({
   await connection();
   const { id } = await params;
   const query = await searchParams;
-  const raw = query.paid_through;
-  const paidThrough = Array.isArray(raw) ? raw[0] : raw;
   const loaded = await loadListingEditor(id);
-  if (!loaded) {
+  if (loaded.status === "error") {
+    return (
+      <div className="shell py-16">
+        <h1 className="font-serif text-4xl font-normal">We couldn&apos;t load this draft.</h1>
+        <p className="mt-4 text-sm text-muted">Please try again.</p>
+      </div>
+    );
+  }
+  if (loaded.status !== "ready") {
     return (
       <div className="shell py-16">
         <h1 className="font-serif text-4xl font-normal">Sign in to see this listing</h1>
@@ -44,9 +52,20 @@ async function Setup({
     );
   }
 
+  const paidRaw = query.paid_through;
+  const paidThrough = Array.isArray(paidRaw) ? paidRaw[0] : paidRaw;
+  const iso = paidThrough || loaded.listing.paidThrough;
+  const paidLabel =
+    iso && !Number.isNaN(new Date(iso).getTime()) ? paidThroughMonthYear(iso) : null;
+  const stepRaw = query.step;
+
   return (
-    <div className="shell py-12 lg:py-16">
-      <SetupReceipt listingId={id} title={loaded.title} initialPaidThrough={paidThrough ?? null} />
-    </div>
+    <ListingSetup
+      listingId={id}
+      initial={loaded.listing.draft}
+      initialStep={stepFromQuery(Array.isArray(stepRaw) ? stepRaw[0] : stepRaw)}
+      placeLabel={loaded.listing.placeLabel}
+      paidThroughLabel={paidLabel}
+    />
   );
 }

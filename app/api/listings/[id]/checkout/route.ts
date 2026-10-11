@@ -72,6 +72,11 @@ export async function POST(request: Request, context: Context) {
   const session = await stripe.checkout.sessions.create({
     ui_mode: EMBEDDED_CHECKOUT_UI_MODE,
     mode: "subscription",
+    branding_settings: {
+      button_color: "#2e4a3b",
+      font_family: "inter",
+      border_style: "rectangular",
+    },
     customer_email: user.email ?? undefined,
     return_url: `${requestOrigin(request)}/owners/listings/${id}/setup?session_id={CHECKOUT_SESSION_ID}`,
     metadata,

@@ -3,12 +3,15 @@ import {
   listingPublicColumns,
   type AvailabilityWindow,
   type FeeKind,
+  type ListingBedroom,
+  type ListingBlockedDate,
   type ListingFee,
   type ListingManagement,
   type ListingPhoto,
   type ListingPublic,
   type Location,
   type PropertyType,
+  type PublicLandlord,
 } from "@/lib/db/types";
 import { fixtureListings } from "@/lib/listing-fixtures";
 import { formatCents } from "@/lib/money";
@@ -17,7 +20,8 @@ import { createPublicClient } from "@/lib/supabase/public";
 
 /**
  * Catalog reads from `listings`, `listing_fees`, `listing_photos`,
- * `availability_windows`, and `locations`.
+ * `listing_bedrooms`, `listing_blocked_dates`, `availability_windows`,
+ * and `locations`.
  * The select list is `listingPublicColumns`, so a public page never asks
  * for the private street address.
  */
@@ -48,6 +52,8 @@ export type PublicListing = Omit<ListingPublic, CatalogText | CatalogNumber> & {
   fees: ListingFee[];
   photos: ListingPhoto[];
   availability_windows: AvailabilityWindow[];
+  rooms: ListingBedroom[];
+  blocked_dates: ListingBlockedDate[];
 };
 
 const FEE_ORDER: FeeKind[] = [
@@ -66,7 +72,10 @@ function asNumber(value: number | string | null | undefined): number | null {
 
 function normalizeListing(
   row: ListingPublic,
-): Omit<PublicListing, "location" | "fees" | "photos" | "availability_windows"> {
+): Omit<
+  PublicListing,
+  "location" | "fees" | "photos" | "availability_windows" | "rooms" | "blocked_dates"
+> {
   return {
     ...row,
     title: row.title ?? "",
@@ -81,6 +90,11 @@ function normalizeListing(
     approx_lat: asNumber(row.approx_lat),
     approx_lng: asNumber(row.approx_lng),
     amenities: row.amenities ?? [],
+    good_for: row.good_for ?? [],
+    square_feet: asNumber(row.square_feet),
+    space_description: row.space_description ?? null,
+    smoking_allowed: Boolean(row.smoking_allowed),
+    calendar_updated_at: row.calendar_updated_at ?? null,
   };
 }
 
@@ -117,20 +131,32 @@ async function readCatalog(): Promise<PublicListing[]> {
   const ids = listings.map((listing) => listing.id);
   const locationIds = [...new Set(listings.map((listing) => listing.location_id))];
 
-  const [feesResult, photosResult, windowsResult, locationsResult] = await Promise.all([
-    supabase.from("listing_fees").select("*").in("listing_id", ids),
-    supabase.from("listing_photos").select("*").in("listing_id", ids),
-    supabase.from("availability_windows").select("*").in("listing_id", ids),
-    supabase.from("locations").select("*").in("id", locationIds),
-  ]);
+  const [feesResult, photosResult, windowsResult, locationsResult, roomsResult, blockedResult] =
+    await Promise.all([
+      supabase.from("listing_fees").select("*").in("listing_id", ids),
+      supabase.from("listing_photos").select("*").in("listing_id", ids),
+      supabase.from("availability_windows").select("*").in("listing_id", ids),
+      supabase.from("locations").select("*").in("id", locationIds),
+      supabase.from("listing_bedrooms").select("*").in("listing_id", ids),
+      supabase.from("listing_blocked_dates").select("*").in("listing_id", ids),
+    ]);
 
-  if (feesResult.error || photosResult.error || windowsResult.error || locationsResult.error) {
+  if (
+    feesResult.error ||
+    photosResult.error ||
+    windowsResult.error ||
+    locationsResult.error ||
+    roomsResult.error ||
+    blockedResult.error
+  ) {
     throw new Error("Could not load listing details");
   }
 
   const fees = groupByListing((feesResult.data ?? []).map(normalizeFee));
   const photos = groupByListing(photosResult.data ?? []);
   const windows = groupByListing(windowsResult.data ?? []);
+  const rooms = groupByListing((roomsResult.data ?? []) as ListingBedroom[]);
+  const blocked = groupByListing((blockedResult.data ?? []) as ListingBlockedDate[]);
   const locations = new Map(
     (locationsResult.data ?? []).map((location) => [location.id, location]),
   );
@@ -145,6 +171,8 @@ async function readCatalog(): Promise<PublicListing[]> {
         fees: fees.get(listing.id) ?? [],
         photos: photos.get(listing.id) ?? [],
         availability_windows: windows.get(listing.id) ?? [],
+        rooms: rooms.get(listing.id) ?? [],
+        blocked_dates: blocked.get(listing.id) ?? [],
       },
     ];
   });
@@ -387,4 +415,18 @@ export function confirmationLabel(iso: string): string {
 
 export function primaryPhoto(listing: PublicListing): ListingPhoto | undefined {
   return sortedPhotos(listing)[0];
+}
+
+/** Empty when the listing is not public, or the owner has no name on file. */
+export async function getPublicLandlord(listingId: string): Promise<PublicLandlord | null> {
+  try {
+    const supabase = createPublicClient();
+    const { data, error } = await supabase.rpc("public_listing_landlord", {
+      listing_id: listingId,
+    });
+    if (error || !data || data.length === 0) return null;
+    return data[0] ?? null;
+  } catch {
+    return null;
+  }
 }

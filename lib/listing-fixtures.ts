@@ -15,6 +15,10 @@ const bend = bendLocation();
  * These rows omit address_private.
  */
 export function fixtureListings(): PublicListing[] {
+  return fixtureRows().map((listing) => ({ ...listing, rooms: [], blocked_dates: [] }));
+}
+
+function fixtureRows(): Omit<PublicListing, "rooms" | "blocked_dates">[] {
   const location = bend;
   return [
     {
@@ -36,6 +40,11 @@ export function fixtureListings(): PublicListing[] {
       max_stay_months: null,
       amenities: ["Furnished", "Washer and dryer", "Workspace", "Kitchen"],
       house_rules: "No smoking. Quiet hours after 10pm.",
+      square_feet: null,
+      space_description: null,
+      smoking_allowed: false,
+      calendar_updated_at: null,
+      good_for: [],
       approx_lat: 44.04,
       approx_lng: -121.33,
       management: "self_managed",
@@ -75,6 +84,7 @@ export function fixtureListings(): PublicListing[] {
           storage_path: "demo/p1.jpg",
           caption: "Detached ADU on a pine lot",
           sort: 0,
+          is_cover: false,
         },
       ],
       availability_windows: [
@@ -107,6 +117,11 @@ export function fixtureListings(): PublicListing[] {
       max_stay_months: 6,
       amenities: ["Furnished", "Pine views", "Parking", "Heating"],
       house_rules: "No pets. No parties. Park in the marked space.",
+      square_feet: null,
+      space_description: null,
+      smoking_allowed: false,
+      calendar_updated_at: null,
+      good_for: [],
       approx_lat: 44.08,
       approx_lng: -121.35,
       management: "self_managed",
@@ -146,6 +161,7 @@ export function fixtureListings(): PublicListing[] {
           storage_path: "demo/p2.jpg",
           caption: "Bedroom with pine views",
           sort: 0,
+          is_cover: false,
         },
       ],
       availability_windows: [
@@ -178,6 +194,11 @@ export function fixtureListings(): PublicListing[] {
       max_stay_months: null,
       amenities: ["Furnished", "Walk to downtown", "Dishwasher", "Patio"],
       house_rules: "Dogs are welcome on the patio. No smoking indoors.",
+      square_feet: null,
+      space_description: null,
+      smoking_allowed: false,
+      calendar_updated_at: null,
+      good_for: [],
       approx_lat: 44.06,
       approx_lng: -121.31,
       management: "fk_managed",
@@ -217,6 +238,7 @@ export function fixtureListings(): PublicListing[] {
           storage_path: "demo/p3.jpg",
           caption: "Garden apartment kitchen",
           sort: 0,
+          is_cover: false,
         },
       ],
       availability_windows: [

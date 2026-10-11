@@ -4,16 +4,21 @@ import { EmbeddedCheckout, EmbeddedCheckoutProvider } from "@stripe/react-stripe
 import { loadStripe } from "@stripe/stripe-js";
 import { useMemo } from "react";
 
-/** Mounted only after checkout returns a client_secret. */
-export function StripeEmbed({ clientSecret }: { clientSecret: string }) {
-  const stripePromise = useMemo(
-    () => loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? ""),
-    [],
-  );
+/** Mounted only with a publishable key and a client secret. */
+export function StripeEmbed({
+  clientSecret,
+  publishableKey,
+}: {
+  clientSecret: string;
+  publishableKey: string;
+}) {
+  const stripePromise = useMemo(() => loadStripe(publishableKey), [publishableKey]);
 
   return (
-    <EmbeddedCheckoutProvider stripe={stripePromise} options={{ clientSecret }}>
-      <EmbeddedCheckout />
-    </EmbeddedCheckoutProvider>
+    <div key={clientSecret}>
+      <EmbeddedCheckoutProvider stripe={stripePromise} options={{ clientSecret }}>
+        <EmbeddedCheckout />
+      </EmbeddedCheckoutProvider>
+    </div>
   );
 }
