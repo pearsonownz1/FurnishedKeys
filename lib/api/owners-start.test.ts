@@ -15,7 +15,8 @@ const locationId = "c3a1e0b2-4d5f-4a6b-8c7d-111111111101";
 const userId = "22222222-2222-4222-8222-222222222222";
 const listingId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const SIGN_IN_HINT =
-  "An account with this email already exists. Sign in, then start the listing again.";
+  "An account with this email already exists. Sign in, or use Forgot password.";
+const password = "correct-horse";
 
 function chain(result: { data: unknown; error: unknown }) {
   const builder = {
@@ -37,7 +38,7 @@ function chain(result: { data: unknown; error: unknown }) {
   return builder;
 }
 
-function startRequest() {
+function startRequest(extra: Record<string, unknown> = { password }) {
   return new Request("https://furnishedkeys.com/api/owners/start", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -47,6 +48,7 @@ function startRequest() {
       phone: "5415550100",
       property_type: "apartment",
       location_id: locationId,
+      ...extra,
     }),
   });
 }
@@ -100,10 +102,10 @@ describe("POST /api/owners/start", () => {
     expect(created.email).toBe("ada@example.com");
     expect(created.email_confirm).toBe(true);
     expect(created.user_metadata).toEqual({ full_name: "Ada Lovelace" });
-    expect(created.password.length).toBeGreaterThan(0);
+    expect(created.password).toBe(password);
     expect(signInWithPassword).toHaveBeenCalledWith({
       email: "ada@example.com",
-      password: created.password,
+      password,
     });
     expect(JSON.stringify(body)).not.toContain(created.password);
   });
@@ -131,6 +133,63 @@ describe("POST /api/owners/start", () => {
 
     expect(response.status).toBe(401);
     expect(await response.json()).toEqual({ error: "Sign in required", hint: SIGN_IN_HINT });
+    expect(signInWithPassword).not.toHaveBeenCalled();
+  });
+
+  it("returns 422 when a new account has no password", async () => {
+    vi.mocked(sessionUser).mockResolvedValue({
+      supabase: { auth: { signInWithPassword: vi.fn() } } as unknown as Awaited<
+        ReturnType<typeof sessionUser>
+      >["supabase"],
+      user: null,
+    });
+    vi.mocked(createServiceClient).mockReturnValue(
+      serviceClient(vi.fn()) as unknown as ReturnType<typeof createServiceClient>,
+    );
+
+    const response = await POST(startRequest({}));
+
+    expect(response.status).toBe(422);
+    expect(await response.json()).toEqual({ error: "Password must be at least 8 characters" });
+  });
+
+  it("returns 422 when a new password is shorter than 8 characters", async () => {
+    vi.mocked(sessionUser).mockResolvedValue({
+      supabase: { auth: { signInWithPassword: vi.fn() } } as unknown as Awaited<
+        ReturnType<typeof sessionUser>
+      >["supabase"],
+      user: null,
+    });
+    vi.mocked(createServiceClient).mockReturnValue(
+      serviceClient(vi.fn()) as unknown as ReturnType<typeof createServiceClient>,
+    );
+
+    const response = await POST(startRequest({ password: "short" }));
+
+    expect(response.status).toBe(422);
+    expect(await response.json()).toEqual({ error: "Password must be at least 8 characters" });
+  });
+
+  it("ignores password when a session already exists", async () => {
+    const createUser = vi.fn();
+    const signInWithPassword = vi.fn();
+    vi.mocked(sessionUser).mockResolvedValue({
+      supabase: { auth: { signInWithPassword } } as unknown as Awaited<
+        ReturnType<typeof sessionUser>
+      >["supabase"],
+      user: { id: userId, email: "ada@example.com" } as NonNullable<
+        Awaited<ReturnType<typeof sessionUser>>["user"]
+      >,
+    });
+    vi.mocked(createServiceClient).mockReturnValue(
+      serviceClient(createUser) as unknown as ReturnType<typeof createServiceClient>,
+    );
+
+    const response = await POST(startRequest({}));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ listing_id: listingId });
+    expect(createUser).not.toHaveBeenCalled();
     expect(signInWithPassword).not.toHaveBeenCalled();
   });
 });

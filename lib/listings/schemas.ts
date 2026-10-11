@@ -9,6 +9,9 @@ const propertyTypeSchema = z.enum(propertyTypes);
 
 const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
+/** Checked only for a new account. Signed-in callers may omit it. */
+export const ownerPasswordSchema = z.string().min(8).max(72);
+
 export const startListingSchema = z.object({
   full_name: z.string().trim().min(1).max(200),
   email: z.string().trim().email().max(200),
@@ -16,6 +19,7 @@ export const startListingSchema = z.object({
   property_type: propertyTypeSchema,
   location_id: z.string().uuid(),
   source: z.string().trim().regex(SOURCE_PATTERN).optional(),
+  password: z.string().optional(),
 });
 
 export const createListingSchema = z.object({
