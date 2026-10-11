@@ -1,11 +1,12 @@
 import { accessDenied, jsonError, requestOrigin } from "@/lib/api/http";
-import { countChildren, loadOwnerListing, sessionUser } from "@/lib/api/owner-listing";
+import { loadOwnerListing, loadSetupState, sessionUser } from "@/lib/api/owner-listing";
 import {
   feeCoversListing,
   missingSubmitFields,
   requireEditableListing,
   slugFromTitle,
 } from "@/lib/listings/access";
+import { coverPhotoId } from "@/lib/listings/setup";
 import { paymentsConfigured, paymentsNotReady } from "@/lib/stripe/config";
 
 type Context = { params: Promise<{ id: string }> };
@@ -25,13 +26,21 @@ export async function POST(request: Request, context: Context) {
     });
   }
 
-  const counts = await countChildren(supabase, id);
+  const setup = await loadSetupState(supabase, id);
+  const coverId = coverPhotoId(setup.photos);
+  if (coverId) {
+    const marked = await supabase.from("listing_photos").update({ is_cover: true }).eq("id", coverId);
+    if (marked.error) return jsonError(400, marked.error.message);
+  }
   const missing = missingSubmitFields({
     title: listing.title,
     description: listing.description,
     monthly_rent_cents: listing.monthly_rent_cents,
-    photoCount: counts.photoCount,
-    availabilityCount: counts.availabilityCount,
+    min_stay_months: listing.min_stay_months,
+    bedroomCount: setup.bedroomCount,
+    bathrooms: listing.bathrooms,
+    photoCount: setup.photoCount,
+    hasCover: setup.hasCover || Boolean(coverId),
   });
   if (missing.length > 0) {
     return jsonError(422, "Listing is incomplete", { missing });

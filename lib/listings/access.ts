@@ -75,16 +75,22 @@ export type CompletenessInput = {
   title: string | null;
   description: string | null;
   monthly_rent_cents: number | null;
+  min_stay_months: number | null;
+  bedroomCount: number;
+  bathrooms: number | null;
   photoCount: number;
-  availabilityCount: number;
+  hasCover: boolean;
 };
 
 const MISSING_LABELS = {
   title: "title",
   description: "description",
   rent: "rent",
+  min_stay: "min_stay",
+  bedroom: "bedroom",
+  bathrooms: "bathrooms",
   photo: "photo",
-  availability: "availability",
+  cover: "cover",
 } as const;
 
 export function missingSubmitFields(input: CompletenessInput): string[] {
@@ -94,8 +100,13 @@ export function missingSubmitFields(input: CompletenessInput): string[] {
   if (input.monthly_rent_cents == null || input.monthly_rent_cents <= 0) {
     missing.push(MISSING_LABELS.rent);
   }
+  if (input.min_stay_months == null || input.min_stay_months < 1) {
+    missing.push(MISSING_LABELS.min_stay);
+  }
+  if (input.bedroomCount < 1) missing.push(MISSING_LABELS.bedroom);
+  if (input.bathrooms == null || input.bathrooms <= 0) missing.push(MISSING_LABELS.bathrooms);
   if (input.photoCount < 1) missing.push(MISSING_LABELS.photo);
-  if (input.availabilityCount < 1) missing.push(MISSING_LABELS.availability);
+  if (!input.hasCover) missing.push(MISSING_LABELS.cover);
   return missing;
 }
 
