@@ -19,6 +19,8 @@ export function SiteFooter() {
         <Link href="/owners">Owners</Link>
         <span aria-hidden="true">·</span>
         <Link href="/management">Management</Link>
+        <span aria-hidden="true">·</span>
+        <Link href="/about">About</Link>
       </nav>
       <Suspense fallback={null}>
         <DemoNote />

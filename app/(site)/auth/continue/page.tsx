@@ -2,11 +2,13 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { readOtpLink } from "@/lib/auth-confirm";
+import { canonical } from "@/lib/site";
 
 export const metadata = {
   title: "Continue",
   description: "Finish opening the link from your email.",
   robots: { index: false, follow: false },
+  ...canonical("/auth/continue"),
 };
 
 type Search = Record<string, string | string[] | undefined>;

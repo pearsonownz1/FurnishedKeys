@@ -2,6 +2,13 @@ import Link from "next/link";
 import { SiteFooter } from "@/components/site-footer";
 import { Suspense } from "react";
 import { AccountHeader } from "@/components/account-header";
+import { canonical } from "@/lib/site";
+
+export const metadata = {
+  title: "Page not found",
+  robots: { index: false, follow: false },
+  ...canonical("/"),
+};
 
 export default function NotFound() {
   return (

@@ -1,10 +1,12 @@
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { ForgotPasswordForm } from "@/components/auth/forgot-password-form";
+import { canonical } from "@/lib/site";
 
 export const metadata = {
   title: "Forgot password",
   description: "Email yourself a link to choose a new password.",
+  ...canonical("/forgot-password"),
 };
 
 type Search = Record<string, string | string[] | undefined>;

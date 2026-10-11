@@ -274,6 +274,13 @@ export function monthlyTotalCents(
   return listing.monthly_rent_cents + monthlyFees;
 }
 
+/** Rent plus monthly fees, as one browse line. */
+export function allInLine(
+  listing: Pick<PublicListing, "monthly_rent_cents" | "fees">,
+): string {
+  return `about ${formatCents(monthlyTotalCents(listing))}/mo all-in`;
+}
+
 export function orderedFees(fees: ListingFee[]): ListingFee[] {
   return [...fees].sort(
     (a, b) => FEE_ORDER.indexOf(a.kind) - FEE_ORDER.indexOf(b.kind),
@@ -338,6 +345,12 @@ export function managementLabel(management: ListingManagement): string {
 export function bedLabel(bedrooms: number): string {
   if (bedrooms === 0) return "Studio";
   return bedrooms === 1 ? "1 bed" : `${bedrooms} bed`;
+}
+
+export function bedsAndSleeps(
+  listing: Pick<PublicListing, "bedrooms" | "max_occupants">,
+): string {
+  return `${bedLabel(listing.bedrooms)} · Sleeps ${listing.max_occupants}`;
 }
 
 export function bathLabel(bathrooms: number): string {

@@ -3,10 +3,12 @@ import { Suspense } from "react";
 import { SignupForm } from "@/components/auth/signup-form";
 import { sanitizeSource } from "@/lib/leads";
 import { activeLocations, locationShort } from "@/lib/locations";
+import { canonical } from "@/lib/site";
 
 export const metadata = {
   title: "Create account",
   description: "Free to list. We only earn when you rent.",
+  ...canonical("/signup"),
 };
 
 type Search = Record<string, string | string[] | undefined>;

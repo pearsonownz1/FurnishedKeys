@@ -66,6 +66,26 @@ export function formatMonthDayYear(iso: string): string {
   }).format(date);
 }
 
+/** When the inquiry arrived, in Pacific time. */
+export function receivedLabel(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "America/Los_Angeles",
+  }).format(date);
+}
+
+export function inquiryStatusLabel(status: InquiryStatus): string {
+  if (status === "responded") return "Responded";
+  if (status === "closed") return "Closed";
+  return "New";
+}
+
 export function confirmationIsStale(iso: string | null, now: Date): boolean {
   if (!iso) return false;
   const confirmed = new Date(iso).getTime();

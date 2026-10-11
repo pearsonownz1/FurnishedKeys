@@ -38,6 +38,16 @@ describe("copy guard", () => {
     expect(hits).toEqual([]);
   });
 
+  it("asks about management without listing the work", () => {
+    const page = readFileSync("app/(site)/management/page.tsx", "utf8");
+    const home = readFileSync("components/home-page.tsx", "utf8");
+    expect(page).toContain(
+      "Ask us about full management. Pricing set in your free assessment.",
+    );
+    expect(page).not.toMatch(/showings|move-in|upkeep/i);
+    expect(home).not.toMatch(/showings|upkeep/i);
+  });
+
   it("does not show a management price", () => {
     const pages = walk("app").filter((file) => file.includes("management"));
     expect(pages.length).toBeGreaterThan(0);

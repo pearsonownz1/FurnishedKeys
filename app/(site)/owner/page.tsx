@@ -4,10 +4,12 @@ import { Suspense } from "react";
 import { ListingBoard } from "@/components/owner/listing-board";
 import { confirmationBanner, type BoardInquiry, type BoardListing } from "@/lib/owner-board";
 import { loadOwnerBoard } from "@/lib/owner-board-load";
+import { canonical } from "@/lib/site";
 
 export const metadata = {
   title: "Your listings",
   description: "Live, in review, and draft listings for your account.",
+  ...canonical("/owner"),
 };
 
 export default function OwnerPage() {

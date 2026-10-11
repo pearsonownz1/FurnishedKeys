@@ -2,10 +2,12 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { ResetPasswordForm } from "@/components/auth/reset-password-form";
 import { createClient } from "@/lib/supabase/server";
+import { canonical } from "@/lib/site";
 
 export const metadata = {
   title: "Reset password",
   description: "Choose a new password for your account.",
+  ...canonical("/reset-password"),
 };
 
 export default function ResetPasswordPage() {

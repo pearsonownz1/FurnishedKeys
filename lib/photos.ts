@@ -3,6 +3,17 @@ import { createPublicClient } from "@/lib/supabase/public";
 /** Private Storage bucket. Serve files with a signed URL batch per listing. */
 export const LISTING_PHOTOS_BUCKET = "listing-photos";
 
+/** Shared cover used when a listing has no photo, or a photo cannot be signed. */
+export const COVER_PLACEHOLDER_SRC = "/placeholder-cover.svg";
+
+export function coverImageSrc(url: string | null | undefined): string {
+  return url ? url : COVER_PLACEHOLDER_SRC;
+}
+
+export function coverImageAlt(url: string | null | undefined, alt: string): string {
+  return url ? alt : "Photo coming soon";
+}
+
 export const LISTING_PHOTO_TTL_SECONDS = 60 * 60;
 
 /**

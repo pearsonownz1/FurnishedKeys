@@ -4,21 +4,20 @@ import { BrowseBoard } from "@/components/browse/browse-board";
 import type { BrowseItem } from "@/components/browse/listing-row";
 import { FilterBar } from "@/components/browse/filter-bar";
 import {
-  browseMeta,
-  confirmationLabel,
+  allInLine,
+  bedsAndSleeps,
   filterListings,
-  formatBrowseFee,
   getPublicListings,
   latestConfirmedAt,
-  minStayTag,
-  orderedFees,
-  petTag,
+  minimumStayLabel,
   primaryPhoto,
+  propertyTypeLabel,
   sortByRecentConfirmation,
 } from "@/lib/listings";
 import { locationBySlug } from "@/lib/locations";
 import { formatCents } from "@/lib/money";
 import { signedPhotoUrls } from "@/lib/photos";
+import { canonical } from "@/lib/site";
 import { moveInOptions, parseListingQuery, type BrowseView } from "@/lib/search";
 
 type Search = Record<string, string | string[] | undefined>;
@@ -26,6 +25,7 @@ type Search = Record<string, string | string[] | undefined>;
 export const metadata = {
   title: "Furnished rentals",
   description: "Furnished homes for monthly and extended stays.",
+  ...canonical("/rentals"),
 };
 
 export default function RentalsPage({
@@ -47,7 +47,7 @@ async function RentalsResults({
 }) {
   await connection();
   const query = parseListingQuery(await searchParams);
-  const view: BrowseView = query.view ?? "split";
+  const view: BrowseView = query.view ?? "list";
   let catalogError = false;
   let items: BrowseItem[] = [];
 
@@ -63,11 +63,12 @@ async function RentalsResults({
         id: listing.id,
         slug: listing.slug,
         title: listing.title,
-        meta: browseMeta(listing),
+        typeLabel: propertyTypeLabel(listing.property_type),
+        bedsLine: bedsAndSleeps(listing),
         rent: formatCents(listing.monthly_rent_cents),
-        fees: orderedFees(listing.fees).map(formatBrowseFee),
-        tags: [minStayTag(listing.min_stay_months), petTag(listing)],
-        confirmed: confirmed ? confirmationLabel(confirmed) : null,
+        allIn: allInLine(listing),
+        minimumStay: minimumStayLabel(listing.min_stay_months),
+        confirmed: Boolean(confirmed),
         imageUrl: photo ? (photos.get(photo.storage_path) ?? null) : null,
         imageAlt: photo?.caption ?? listing.title,
         isDemo: listing.is_demo,
@@ -90,15 +91,17 @@ async function RentalsResults({
     : `${items.length} ${allDemo ? demoNoun : noun} · Sorted by recently confirmed`;
 
   return (
-    <div>
+    <div className="lg:flex lg:h-[calc(100dvh-4rem)] lg:flex-col">
       <FilterBar key={summary + view + (query.where ?? "")} query={query} moveIns={moveInOptions(new Date())} />
-      <BrowseBoard
-        items={items}
-        title={title}
-        summary={summary}
-        view={view}
-        catalogError={catalogError}
-      />
+      <div className="lg:min-h-0 lg:flex-1">
+        <BrowseBoard
+          items={items}
+          title={title}
+          summary={summary}
+          view={view}
+          catalogError={catalogError}
+        />
+      </div>
     </div>
   );
 }

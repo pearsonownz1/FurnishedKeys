@@ -4,6 +4,12 @@ import { Suspense } from "react";
 import { ListingSetup } from "@/components/listing/listing-setup";
 import { loadListingEditor } from "@/lib/listing-editor-load";
 import { stepFromQuery } from "@/lib/listing-draft";
+import { canonical } from "@/lib/site";
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  return canonical(`/owners/listings/${id}/setup`);
+}
 
 type Search = Record<string, string | string[] | undefined>;
 

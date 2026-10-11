@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { StayCalendar } from "@/components/listing/stay-calendar";
 import { Gallery } from "@/components/property/gallery";
+import { InquiryBar } from "@/components/property/inquiry-bar";
 import { InquiryCard } from "@/components/property/inquiry-card";
 import { PropertyMap } from "@/components/property/property-map";
 import { TrustStrip } from "@/components/property/trust-strip";
@@ -29,6 +30,7 @@ import {
   trustCells,
 } from "@/lib/property-display";
 import { signedPhotoUrls } from "@/lib/photos";
+import { canonical } from "@/lib/site";
 import { addMonths, parseListingQuery } from "@/lib/search";
 
 export async function generateStaticParams() {
@@ -47,10 +49,11 @@ export async function generateMetadata({
 }) {
   const { slug } = await params;
   const listing = await getListingBySlug(slug);
-  if (!listing) return { title: "Home" };
+  if (!listing) return { title: "Home", ...canonical("/rentals") };
   return {
     title: listing.title,
     description: listing.description ?? undefined,
+    ...canonical(`/rentals/${listing.slug}`),
   };
 }
 
@@ -130,7 +133,7 @@ async function ListingBody({
   const blocked = expandRanges(listing.blocked_dates);
 
   return (
-    <article className="px-5 py-7 md:px-8 lg:px-16">
+    <article className="px-5 py-7 pb-28 md:px-8 lg:px-16 lg:pb-7">
       <p className="mb-4 text-[13px] text-muted">
         <Link href="/rentals" className="hover:text-ink">
           {locationShort(listing.location)}
@@ -280,6 +283,7 @@ async function ListingBody({
           }}
         />
       </div>
+      <InquiryBar rentLabel={formatCents(listing.monthly_rent_cents)} />
     </article>
   );
 }
