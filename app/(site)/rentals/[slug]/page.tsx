@@ -31,7 +31,7 @@ import {
 } from "@/lib/property-display";
 import { signedPhotoUrls } from "@/lib/photos";
 import { canonical } from "@/lib/site";
-import { addMonths, parseListingQuery } from "@/lib/search";
+import { addMonths, listingQueryString, parseListingQuery } from "@/lib/search";
 
 export async function generateStaticParams() {
   try {
@@ -88,15 +88,20 @@ async function ListingBody({
   const signed = await signedPhotoUrls([listing]);
   const landlord = await getPublicLandlord(listing.id);
   const window = primaryWindow(listing.availability_windows);
-  const moveIn =
-    query.moveIn && window && query.moveIn >= window.available_from
-      ? query.moveIn
-      : (window?.available_from ?? "");
+  const flexible = Boolean(query.flexible);
+  const fromSearch = Boolean(query.moveIn || query.moveOut || flexible);
+  const moveIn = fromSearch ? (query.moveIn ?? "") : (window?.available_from ?? "");
   const stay =
     query.stayMonths && query.stayMonths >= listing.min_stay_months
       ? query.stayMonths
       : listing.min_stay_months;
-  const moveOut = moveIn ? addMonths(moveIn, stay) : "";
+  const moveOut = flexible
+    ? ""
+    : fromSearch
+      ? (query.moveOut ?? "")
+      : moveIn
+        ? addMonths(moveIn, stay)
+        : "";
   const tags = goodForTags(listing.good_for ?? []);
   const facts = propertyFactLine({
     type: propertyTypeName(listing.property_type),
@@ -135,7 +140,7 @@ async function ListingBody({
   return (
     <article className="px-5 py-7 pb-28 md:px-8 lg:px-16 lg:pb-7">
       <p className="mb-4 text-[13px] text-muted">
-        <Link href="/rentals" className="hover:text-ink">
+        <Link href={`/rentals${listingQueryString(query)}`} className="hover:text-ink">
           {locationShort(listing.location)}
         </Link>
         <span aria-hidden="true"> / </span>
@@ -269,12 +274,13 @@ async function ListingBody({
           </p>
         </div>
         <InquiryCard
+          key={`${listing.id}:${moveIn}:${moveOut}:${flexible ? "1" : "0"}`}
           listingId={listing.id}
           rentLabel={formatCents(listing.monthly_rent_cents)}
           availabilityLine={
             window ? `Available ${window.available_from}` : "Ask about availability"
           }
-          defaults={{ moveIn, moveOut, occupants: 1 }}
+          defaults={{ moveIn, moveOut, flexible, occupants: 1 }}
           constraints={{
             minStayMonths: listing.min_stay_months,
             maxOccupants: listing.max_occupants,

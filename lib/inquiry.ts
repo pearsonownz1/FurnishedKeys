@@ -1,11 +1,13 @@
 import type { AvailabilityWindow, InquiryInsert } from "@/lib/db/types";
 import { stayHitsBlocked } from "@/lib/owner-dashboard";
-import { stayMonthsBetween } from "@/lib/search";
+import { isIsoDate, stayMonthsBetween } from "@/lib/search";
 
 export type InquiryInput = {
   listingId: string;
   moveIn: string;
   moveOut: string;
+  /** Open-ended stay. Not a column on inquiries; move-out is stored null. */
+  flexible?: boolean;
   occupants: number;
   pets: string;
   name: string;
@@ -14,7 +16,7 @@ export type InquiryInput = {
   message: string;
 };
 
-export type InquiryField = keyof Omit<InquiryInput, "listingId">;
+export type InquiryField = keyof Omit<InquiryInput, "listingId" | "flexible">;
 
 export type InquiryResult =
   | { ok: true }
@@ -31,7 +33,6 @@ export type InquiryActionState = {
   formError?: string;
 };
 
-const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function validateInquiry(
@@ -46,20 +47,22 @@ export function validateInquiry(
 ): InquiryResult {
   const fieldErrors: Partial<Record<InquiryField, string>> = {};
 
-  if (!datePattern.test(input.moveIn)) {
+  if (!isIsoDate(input.moveIn)) {
     fieldErrors.moveIn = "Choose a move-in date.";
   }
-  if (!datePattern.test(input.moveOut)) {
+  if (!input.flexible && !isIsoDate(input.moveOut)) {
     fieldErrors.moveOut = "Choose a move-out date.";
   }
   if (
-    datePattern.test(input.moveIn) &&
-    datePattern.test(input.moveOut) &&
+    !input.flexible &&
+    isIsoDate(input.moveIn) &&
+    isIsoDate(input.moveOut) &&
     input.moveOut <= input.moveIn
   ) {
     fieldErrors.moveOut = "Move-out has to be after move-in.";
   }
   if (
+    !input.flexible &&
     !fieldErrors.moveIn &&
     !fieldErrors.moveOut &&
     stayMonthsBetween(input.moveIn, input.moveOut) < constraints.minStayMonths
@@ -72,13 +75,15 @@ export function validateInquiry(
     constraints.availability.length > 0 &&
     !constraints.availability.some((window) => {
       if (window.available_from > input.moveIn) return false;
-      if (window.available_to && window.available_to < input.moveOut) return false;
+      const end = input.flexible ? input.moveIn : input.moveOut;
+      if (window.available_to && window.available_to < end) return false;
       return true;
     })
   ) {
     fieldErrors.moveIn = "Those dates are outside the confirmed window.";
   }
   if (
+    !input.flexible &&
     !fieldErrors.moveIn &&
     !fieldErrors.moveOut &&
     stayHitsBlocked(input.moveIn, input.moveOut, constraints.blockedDates ?? [])
@@ -118,10 +123,12 @@ export function validateInquiry(
 }
 
 export function readInquiryForm(formData: FormData): InquiryInput {
+  const flexible = formData.get("flexible") === "1";
   return {
     listingId: String(formData.get("listingId") ?? ""),
     moveIn: String(formData.get("moveIn") ?? ""),
-    moveOut: String(formData.get("moveOut") ?? ""),
+    moveOut: flexible ? "" : String(formData.get("moveOut") ?? ""),
+    flexible,
     occupants: Number(formData.get("occupants")),
     pets: String(formData.get("pets") ?? ""),
     name: String(formData.get("name") ?? ""),
@@ -142,7 +149,7 @@ export function toInquiryInsert(input: InquiryInput): InquiryInsert {
     email: input.email.trim(),
     phone: phone || null,
     move_in: input.moveIn,
-    move_out: input.moveOut,
+    move_out: input.moveOut || null,
     occupants: input.occupants,
     pets: pets || null,
     message: input.message.trim(),

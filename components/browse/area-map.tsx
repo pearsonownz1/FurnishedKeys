@@ -28,6 +28,7 @@ type AreaMapProps = {
   showPrices?: boolean;
   navigate?: boolean;
   showNote?: boolean;
+  listingSearch?: string;
 };
 
 const STYLE_URL = "https://tiles.openfreemap.org/styles/positron";
@@ -58,6 +59,7 @@ export function AreaMap({
   showPrices = true,
   navigate = true,
   showNote = true,
+  listingSearch = "",
 }: AreaMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -167,7 +169,7 @@ export function AreaMap({
               setExpandedKey(pin.key);
               return;
             }
-            if (navigate) router.push(`/rentals/${point.slug}`);
+            if (navigate) router.push(`/rentals/${point.slug}${listingSearch}`);
           });
           const marker = new Marker({
             element: button,
@@ -200,7 +202,7 @@ export function AreaMap({
     return () => {
       cancelled = true;
     };
-  }, [pointKey, showPrices, navigate, router, center, expandedKey]);
+  }, [pointKey, showPrices, navigate, router, center, expandedKey, listingSearch]);
 
   useEffect(() => {
     const map = mapRef.current;

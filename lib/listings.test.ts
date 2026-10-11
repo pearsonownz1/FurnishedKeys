@@ -280,4 +280,34 @@ describe("listing catalog", () => {
       "madras-home",
     ]);
   });
+
+  it("excludes a blocked stay and keeps it when the stay is open-ended", () => {
+    const open = listing({ slug: "open-home" });
+    const blocked = listing({
+      slug: "blocked-home",
+      blocked_dates: [
+        {
+          id: "block",
+          listing_id: "blocked-home",
+          start_date: "2026-11-20",
+          end_date: "2026-11-22",
+          note: null,
+        },
+      ],
+    });
+    const homes = [open, blocked];
+    expect(
+      filterListings(homes, { moveIn: "2026-11-01", moveOut: "2026-12-01" }).map(
+        (item) => item.slug,
+      ),
+    ).toEqual(["open-home"]);
+    expect(
+      filterListings(homes, { moveIn: "2026-11-01", moveOut: "2026-11-20" }).map(
+        (item) => item.slug,
+      ),
+    ).toEqual(["open-home", "blocked-home"]);
+    expect(
+      filterListings(homes, { moveIn: "2026-11-01", flexible: true }).map((item) => item.slug),
+    ).toEqual(["open-home", "blocked-home"]);
+  });
 });

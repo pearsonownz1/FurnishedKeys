@@ -110,6 +110,16 @@ summary::-webkit-details-marker {
   outline-offset: -2px;
 }
 
+button.field-input {
+  cursor: pointer;
+  text-align: left;
+}
+
+button.field-input:disabled,
+.field-input[data-empty="true"] {
+  color: var(--muted);
+}
+
 .owner-copy {
   padding: 4rem 1.25rem 3.5rem;
 }

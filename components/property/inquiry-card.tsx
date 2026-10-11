@@ -1,10 +1,12 @@
 "use client";
 
 import { submitInquiry } from "@/app/(site)/rentals/actions";
+import { DateField } from "@/components/date-field";
 import type { InquiryActionState, InquiryField } from "@/lib/inquiry";
 import { readInquiryForm, validateInquiry } from "@/lib/inquiry";
 import type { AvailabilityWindow } from "@/lib/db/types";
-import { useActionState, type ReactNode } from "react";
+import { moveOutAfterMoveInChange } from "@/lib/search";
+import { useActionState, useState, type ReactNode } from "react";
 
 const empty: InquiryActionState = { ok: false };
 
@@ -26,7 +28,7 @@ export function InquiryCard({
   listingId: string;
   rentLabel: string;
   availabilityLine: string;
-  defaults: { moveIn: string; moveOut: string; occupants: number };
+  defaults: { moveIn: string; moveOut: string; occupants: number; flexible?: boolean };
   constraints: Constraints;
 }) {
   async function action(
@@ -40,6 +42,9 @@ export function InquiryCard({
   }
 
   const [state, formAction, pending] = useActionState(action, empty);
+  const [moveIn, setMoveIn] = useState(defaults.moveIn);
+  const [moveOut, setMoveOut] = useState(defaults.flexible ? "" : defaults.moveOut);
+  const [flexible, setFlexible] = useState(Boolean(defaults.flexible));
 
   if (state.success) {
     return (
@@ -68,25 +73,56 @@ export function InquiryCard({
         <input type="hidden" name="listingId" value={listingId} />
         <div className="grid grid-cols-2 border border-line">
           <Field label="Move in" name="moveIn" error={state.fieldErrors?.moveIn}>
-            <input
+            <DateField
               id="moveIn"
-              type="date"
               name="moveIn"
-              defaultValue={defaults.moveIn}
-              aria-invalid={Boolean(state.fieldErrors?.moveIn)}
-              className="w-full bg-transparent text-sm"
+              label="Move in"
+              variant="plain"
+              value={moveIn}
+              invalid={Boolean(state.fieldErrors?.moveIn)}
+              onChange={(next) => {
+                setMoveIn(next);
+                setMoveOut((current) => moveOutAfterMoveInChange(next, current));
+              }}
             />
           </Field>
-          <Field label="Move out" name="moveOut" error={state.fieldErrors?.moveOut}>
-            <input
+          <div className="border-b border-line px-3 py-2.5">
+            <label
+              htmlFor="moveOut"
+              className="mb-0.5 block text-[10px] tracking-[0.1em] text-muted uppercase"
+            >
+              Move out
+            </label>
+            <DateField
               id="moveOut"
-              type="date"
               name="moveOut"
-              defaultValue={defaults.moveOut}
-              aria-invalid={Boolean(state.fieldErrors?.moveOut)}
-              className="w-full bg-transparent text-sm"
+              label="Move out"
+              variant="plain"
+              value={flexible ? "" : moveOut}
+              min={moveIn || undefined}
+              disabled={flexible}
+              invalid={Boolean(state.fieldErrors?.moveOut)}
+              onChange={setMoveOut}
             />
-          </Field>
+            {state.fieldErrors?.moveOut ? (
+              <span className="mt-1 block text-xs text-warn">{state.fieldErrors.moveOut}</span>
+            ) : null}
+            <label className="mt-2 flex min-h-11 cursor-pointer items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                name="flexible"
+                value="1"
+                checked={flexible}
+                onChange={(event) => {
+                  const checked = event.target.checked;
+                  setFlexible(checked);
+                  if (checked) setMoveOut("");
+                }}
+                className="size-4 accent-pine"
+              />
+              I&apos;m not sure
+            </label>
+          </div>
           <Field label="Occupants" name="occupants" error={state.fieldErrors?.occupants}>
             <input
               id="occupants"

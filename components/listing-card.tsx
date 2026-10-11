@@ -14,16 +14,18 @@ import { formatCents } from "@/lib/money";
 export function ListingCard({
   listing,
   imageUrl,
+  search = "",
 }: {
   listing: PublicListing;
   imageUrl: string | null;
+  search?: string;
 }) {
   const photo = primaryPhoto(listing);
   const confirmed = latestConfirmedAt(listing.availability_windows);
 
   return (
     <article>
-      <Link href={`/rentals/${listing.slug}`} className="group block">
+      <Link href={`/rentals/${listing.slug}${search}`} className="group block">
         <div className="relative aspect-[4/3] overflow-hidden rounded-[2px] bg-stone">
           <CoverImage
             src={imageUrl}

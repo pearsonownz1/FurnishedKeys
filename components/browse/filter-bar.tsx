@@ -1,10 +1,12 @@
 "use client";
 
+import { DateField } from "@/components/date-field";
 import { locationShort } from "@/lib/locations";
 import {
   budgetOptions,
-  formatMonthDay,
+  formatMonthDayYear,
   listingQueryString,
+  moveOutAfterMoveInChange,
   stayOptions,
   type ListingQuery,
 } from "@/lib/search";
@@ -34,11 +36,14 @@ const bedOptions = [
 type MenuId = "where" | "dates" | "budget" | "type" | "beds" | "stay";
 
 function datesLabel(query: ListingQuery): string {
-  if (query.moveIn && query.stayMonths) {
-    const stay = query.stayMonths === 1 ? "1 month" : `${query.stayMonths} months`;
-    return `${formatMonthDay(query.moveIn)} for ${stay}`;
+  if (query.flexible) {
+    return query.moveIn ? `${formatMonthDayYear(query.moveIn)} · Not sure` : "Not sure";
   }
-  if (query.moveIn) return formatMonthDay(query.moveIn);
+  if (query.moveIn && query.moveOut) {
+    return `${formatMonthDayYear(query.moveIn)} – ${formatMonthDayYear(query.moveOut)}`;
+  }
+  if (query.moveIn) return formatMonthDayYear(query.moveIn);
+  if (query.moveOut) return `Until ${formatMonthDayYear(query.moveOut)}`;
   if (query.stayMonths) {
     return query.stayMonths === 1 ? "1 month" : `${query.stayMonths} months`;
   }
@@ -53,11 +58,9 @@ function bedsLabel(query: ListingQuery): string {
 
 export function FilterBar({
   query,
-  moveIns,
   places,
 }: {
   query: ListingQuery;
-  moveIns: { value: string; label: string }[];
   places: { id: string; slug: string; name: string; state: string }[];
 }) {
   const router = useRouter();
@@ -66,7 +69,8 @@ export function FilterBar({
   const mapOn = query.view === "map";
   const [menu, setMenu] = useState<MenuId | null>(null);
   const [moveIn, setMoveIn] = useState(query.moveIn ?? "");
-  const [stay, setStay] = useState(query.stayMonths ? String(query.stayMonths) : "");
+  const [moveOut, setMoveOut] = useState(query.flexible ? "" : (query.moveOut ?? ""));
+  const [flexible, setFlexible] = useState(Boolean(query.flexible));
 
   function go(next: ListingQuery) {
     setMenu(null);
@@ -165,51 +169,63 @@ export function FilterBar({
           ) : null}
           {menu === "dates" ? (
             <form
-              className="w-56 max-w-full border border-line bg-surface p-3"
+              className="w-full max-w-sm border border-line bg-surface p-3"
               onSubmit={(event) => {
                 event.preventDefault();
                 go({
                   ...query,
                   moveIn: moveIn || undefined,
-                  stayMonths: stay ? Number(stay) : undefined,
+                  moveOut: flexible ? undefined : moveOut || undefined,
+                  flexible: flexible || undefined,
+                  stayMonths: undefined,
                 });
               }}
             >
               <label className="block text-[10px] tracking-[0.1em] text-muted uppercase" htmlFor="filter-move-in">
                 Move in
               </label>
-              <select
-                id="filter-move-in"
-                value={moveIn}
-                onChange={(event) => setMoveIn(event.target.value)}
-                className="mt-1 w-full border border-line bg-surface px-2 py-1.5 text-sm"
-              >
-                <option value="">Any date</option>
-                {moveIns.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-              <label className="mt-3 block text-[10px] tracking-[0.1em] text-muted uppercase" htmlFor="filter-stay">
-                Stay
+              <div className="mt-1 border border-line px-2 py-2">
+                <DateField
+                  id="filter-move-in"
+                  label="Move in"
+                  variant="plain"
+                  value={moveIn}
+                  onChange={(next) => {
+                    setMoveIn(next);
+                    setMoveOut((current) => moveOutAfterMoveInChange(next, current));
+                  }}
+                />
+              </div>
+              <label className="mt-3 block text-[10px] tracking-[0.1em] text-muted uppercase" htmlFor="filter-move-out">
+                Move out
               </label>
-              <select
-                id="filter-stay"
-                value={stay}
-                onChange={(event) => setStay(event.target.value)}
-                className="mt-1 w-full border border-line bg-surface px-2 py-1.5 text-sm"
-              >
-                <option value="">Any length</option>
-                {stayOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+              <div className="mt-1 border border-line px-2 py-2">
+                <DateField
+                  id="filter-move-out"
+                  label="Move out"
+                  variant="plain"
+                  value={flexible ? "" : moveOut}
+                  min={moveIn || undefined}
+                  disabled={flexible}
+                  onChange={setMoveOut}
+                />
+              </div>
+              <label className="mt-2 flex min-h-11 cursor-pointer items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={flexible}
+                  onChange={(event) => {
+                    const checked = event.target.checked;
+                    setFlexible(checked);
+                    if (checked) setMoveOut("");
+                  }}
+                  className="size-4 accent-pine"
+                />
+                I&apos;m not sure
+              </label>
               <button
                 type="submit"
-                className="mt-3 w-full rounded-[2px] bg-pine px-3 py-2 text-sm font-semibold text-white"
+                className="mt-3 min-h-11 w-full rounded-[2px] bg-pine px-3 py-2 text-sm font-semibold text-white"
               >
                 Apply
               </button>
