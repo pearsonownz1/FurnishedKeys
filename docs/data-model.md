@@ -44,11 +44,11 @@ Enums:
 
 `amenities` and `good_for` are `text[]` (default `'{}'`). The API accepts only keys from `lib/listings/amenities.ts` and `lib/listings/good-for.ts`. `bathrooms` is `numeric(3,1)`. `square_feet` is an integer greater than zero, or null. `space_description` is the longer “The space” copy. `smoking_allowed` defaults to false. `calendar_updated_at` changes when an availability window or blocked date is inserted, updated, or deleted. `bedrooms` remains the integer count; a trigger sets it from `listing_bedrooms` and does not rewrite existing rows until those child rows change.
 
-A stub draft may leave `slug`, `title`, `bedrooms`, `bathrooms`, `max_occupants`, and `monthly_rent_cents` null. Submit checks completeness in the API. An approved row must have a title, a description, rent greater than zero, and `listing_fee_status` of `paid` or `waived`.
+A stub draft may leave `slug`, `title`, `bedrooms`, `bathrooms`, `max_occupants`, and `monthly_rent_cents` null. Submit checks completeness in the API. An approved row must have a title, a description, and rent greater than zero. `listing_fee_status` is not part of that check.
 
-`source` is a short slug, default `web`, with the same format check as `owner_leads.source` (`^[a-z0-9_-]{1,40}$`). Owners can set it on insert and cannot change it later. `renewal_canceled` mirrors Stripe `cancel_at_period_end`. `paid_at` and `admin_note` are for the owner dashboard. `fee_paid_through` is the end of the paid year.
+`source` is a short slug, default `web`, with the same format check as `owner_leads.source` (`^[a-z0-9_-]{1,40}$`). Owners can set it on insert and cannot change it later. `renewal_canceled` mirrors Stripe `cancel_at_period_end` when a subscription exists. `paid_at` and `admin_note` are for the owner dashboard. `fee_paid_through` is the end of a recorded fee period. Listing is free; those fee columns stay for a later commission and do not gate submit, approval, or the catalog.
 
-The public catalog (and child rows, and public photo reads) shows an approved listing only when the fee is `waived`, or `paid` with `fee_paid_through` still in the future. Demo rows stay visible because their fee is waived.
+The public catalog (and child rows, and public photo reads) shows a listing when `status` is `approved`. `private.listing_is_public` is that same check. Demo rows stay visible because they are approved.
 
 ### `listing_payments`
 
@@ -143,7 +143,7 @@ RLS is enabled and forced on every table above. `anon` is a signed-out Data API 
 | --- | --- | --- | --- |
 | `locations` | select active | select active | all |
 | `profiles` | none | select/update own row; insert own row as `renter` | all |
-| `listings` | select `approved` only while the fee is waived or `fee_paid_through` is still in the future | select those public rows; full CRUD where `owner_id` is self, except review, billing, and `source` | all |
+| `listings` | select `approved` | select those public rows; full CRUD where `owner_id` is self, except review, billing, and `source` | all |
 | `listing_payments` | none | select rows for own listings | select all; writes are service role |
 | `listing_fees`, `listing_photos`, `listing_bedrooms`, `listing_blocked_dates`, `availability_windows` | select when the listing is publicly visible | same, plus full CRUD on children of own listings | all |
 | `inquiries` | insert only | insert; select own (`renter_id`), assigned, or owned-listing inquiries; update status/assignee on owned or assigned inquiries | all |
@@ -178,7 +178,9 @@ Each has utilities, a refundable deposit, and either cleaning or a pet fee, plus
 
 ## Listing fee
 
-The listing fee is **$199 per year**, not a one-time charge. When `STRIPE_SECRET_KEY` is set, checkout is Stripe Embedded Checkout (`ui_mode: embedded_page` on the current Stripe API; this is the inline card, name, and ZIP form, not a hosted redirect). `POST /api/listings/[id]/checkout` accepts `{ auto_renew }` (default true) and returns `{ client_secret }`. The return URL is `/owners/listings/{id}/setup?session_id={CHECKOUT_SESSION_ID}`. When `auto_renew` is false, the webhook sets `cancel_at_period_end` on the new subscription. `GET /api/listings/[id]/checkout/status?session_id=` returns `{ status, paid_through }` from Stripe so the setup page can confirm before the webhook lands. A waived listing skips Stripe and that GET returns `{ status: "waived", paid_through }`.
+Listing is free. Submit and approve do not look at `listing_fee_status` or `fee_paid_through`. The checkout, status, cancel-renewal, and Stripe webhook routes are still deployed and unused while the fee UI is removed. The columns and `listing_payments` stay so a later commission can reuse them.
+
+When `STRIPE_SECRET_KEY` is set, checkout is Stripe Embedded Checkout (`ui_mode: embedded_page` on the current Stripe API; this is the inline card, name, and ZIP form, not a hosted redirect). `POST /api/listings/[id]/checkout` accepts `{ auto_renew }` (default true) and returns `{ client_secret }`. The return URL is `/owners/listings/{id}/setup?session_id={CHECKOUT_SESSION_ID}`. When `auto_renew` is false, the webhook sets `cancel_at_period_end` on the new subscription. `GET /api/listings/[id]/checkout/status?session_id=` returns `{ status, paid_through }` from Stripe so the setup page can confirm before the webhook lands. A waived listing skips Stripe and that GET returns `{ status: "waived", paid_through }`.
 
 `POST /api/stripe/webhook` checks the signature and is idempotent on the Stripe event id.
 
@@ -187,11 +189,11 @@ The listing fee is **$199 per year**, not a one-time charge. When `STRIPE_SECRET
 - `invoice.payment_failed` sets the fee unpaid only once `fee_paid_through` has passed.
 - `customer.subscription.deleted` sets the fee unpaid.
 
-If `STRIPE_SECRET_KEY` is missing, `POST /api/listings/[id]/checkout` does not return 503. The service role sets `listing_fee_status` to `waived` and `fee_paid_through` to one year from now, inserts a `listing_payments` row with `status` `waived_no_stripe` and `amount_cents` 0, and returns `200` `{ waived: true, paid_through }`. `paid_through` is an ISO timestamp. If the listing is already `paid` or `waived`, the same body is returned and nothing is written (`paid_through` is the stored value, which can be null when an admin waived the fee without a date). Cancel-renewal and the webhook still return 503 `Payments are not set up yet`. Submit already accepts a waived fee. A missing price id, once Stripe is configured, falls back to `price_data` of 19900 USD with `recurring.interval = year`.
+If `STRIPE_SECRET_KEY` is missing, `POST /api/listings/[id]/checkout` does not return 503. The service role sets `listing_fee_status` to `waived` and `fee_paid_through` to one year from now, inserts a `listing_payments` row with `status` `waived_no_stripe` and `amount_cents` 0, and returns `200` `{ waived: true, paid_through }`. `paid_through` is an ISO timestamp. If the listing is already `paid` or `waived`, the same body is returned and nothing is written (`paid_through` is the stored value, which can be null when an admin waived the fee without a date). Cancel-renewal and the webhook still return 503 `Payments are not set up yet`. A missing price id, once Stripe is configured, falls back to `price_data` of 19900 USD with `recurring.interval = year`. None of that is required to submit or approve.
 
 Session metadata is `listing_id`, `owner_id`, `source`, and `auto_renew`.
 
-Owners cancel renewal with `POST /api/listings/[id]/cancel-renewal` and undo it with `DELETE` on that route, until the period ends. The listing stays public until `fee_paid_through`.
+Owners cancel renewal with `POST /api/listings/[id]/cancel-renewal` and undo it with `DELETE` on that route, until the period ends. Canceling a subscription does not take an approved listing out of the catalog.
 
 There are no refunds. Rejecting a listing sets `cancel_at_period_end` when Stripe is configured and records `cancel_scheduled` in `listing_payments`.
 
@@ -206,10 +208,10 @@ There are no refunds. Rejecting a listing sets `cancel_at_period_end` when Strip
 - `POST /api/listings/[id]/photos` — signed upload URLs under `listing-photos/<listing_id>/...`. 422 when the listing would exceed 20 photos.
 - `POST /api/listings/[id]/checkout` — `{ client_secret }` when Stripe is configured. Without `STRIPE_SECRET_KEY`, `{ waived: true, paid_through }`.
 - `GET /api/listings/[id]/checkout/status?session_id=` — `{ status, paid_through }`. A waived listing returns `{ status: "waived", paid_through }` and does not need `session_id`.
-- `POST /api/listings/[id]/submit` — does not charge. Requires a current paid or waived fee, otherwise 402 `{ checkout_url }` (that URL is the checkout route above, which returns a client secret). 422 `{ missing }` lists any of `title`, `description`, `rent`, `min_stay`, `bedroom`, `bathrooms`, `photo`, and `cover` that are absent. If photos exist and none is the cover, submit marks the first by `sort` before that check. Resubmitting after `changes_requested` does not charge again while `fee_paid_through` is still in the future.
+- `POST /api/listings/[id]/submit` — does not charge and does not check the fee. 422 `{ missing }` lists any of `title`, `description`, `rent`, `min_stay`, `bedroom`, `bathrooms`, `photo`, and `cover` that are absent. If photos exist and none is the cover, submit marks the first by `sort` before that check. A complete listing becomes `pending_review`.
 - `POST /api/listings/[id]/cancel-renewal` and `DELETE` — owner only. 503 when Stripe is not configured.
 - `POST /api/stripe/webhook`
-- `POST /api/admin/listings/[id]/review` — `{ action: approve | request_changes | reject, note? }`. `note` is required for request changes and reject. Approve sets `approved`. Request changes sets `changes_requested`. Reject sets `rejected` and cancels renewal at period end when Stripe is configured.
+- `POST /api/admin/listings/[id]/review` — `{ action: approve | request_changes | reject, note? }`. `note` is required for request changes and reject. Approve sets `approved` when the same completeness list is empty, with no fee check. Request changes sets `changes_requested`. Reject sets `rejected` and cancels renewal at period end when Stripe is configured.
 - `POST /api/admin/listings/[id]/waive` — sets `listing_fee_status = waived`. Admin only.
 
 Front end Embedded Checkout needs `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`. The webhook endpoint to register is `https://furnishedkeys.com/api/stripe/webhook`.

@@ -4,7 +4,7 @@ Marketplace for furnished monthly and extended-stay rentals — ADUs, apartments
 
 **Furnished homes. Flexible stays.** Find a furnished place for your next chapter—or let us help manage yours.
 
-Renters search and send an inquiry. Owners list a property for $199 per year or ask for a management consultation. Listing submission and the yearly fee live under `app/api`. Booking is not built yet.
+Renters search and send an inquiry. Owners list a property for free, or ask for a management consultation. A commission on rented listings comes later. Listing submission lives under `app/api`. Booking is not built yet.
 
 ## Stack
 

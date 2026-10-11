@@ -1,31 +1,18 @@
-import { accessDenied, jsonError, requestOrigin } from "@/lib/api/http";
+import { accessDenied, jsonError } from "@/lib/api/http";
 import { loadSetupState } from "@/lib/api/owner-listing";
 import { openOwnerListing, readOwnerListing } from "@/lib/api/read-owner-listing";
-import {
-  feeCoversListing,
-  missingSubmitFields,
-  requireEditableListing,
-  slugFromTitle,
-} from "@/lib/listings/access";
+import { missingSubmitFields, requireEditableListing, slugFromTitle } from "@/lib/listings/access";
 import { coverPhotoId } from "@/lib/listings/setup";
-import { paymentsConfigured, paymentsNotReady } from "@/lib/stripe/config";
 
 type Context = { params: Promise<{ id: string }> };
 
-export async function POST(request: Request, context: Context) {
+export async function POST(_request: Request, context: Context) {
   const { id } = await context.params;
   const opened = await openOwnerListing(id);
   if (!opened.ok) return opened.response;
   const { supabase, user, listing } = opened;
   const allowed = requireEditableListing(user.id, listing);
   if (!allowed.ok) return accessDenied(allowed);
-
-  if (!feeCoversListing(listing, new Date())) {
-    if (!paymentsConfigured()) return paymentsNotReady();
-    return jsonError(402, "Payment required", {
-      checkout_url: `${requestOrigin(request)}/api/listings/${id}/checkout`,
-    });
-  }
 
   const setup = await loadSetupState(supabase, id);
   const coverId = coverPhotoId(setup.photos);

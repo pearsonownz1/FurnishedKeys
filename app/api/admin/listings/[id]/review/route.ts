@@ -1,7 +1,7 @@
 import { accessDenied, invalidBody, jsonError, readJson } from "@/lib/api/http";
 import { loadRole, loadSetupState, sessionUser, type AppClient } from "@/lib/api/owner-listing";
 import { readOwnerListing } from "@/lib/api/read-owner-listing";
-import { feeCoversListing, missingSubmitFields, requireAdmin } from "@/lib/listings/access";
+import { missingSubmitFields, requireAdmin } from "@/lib/listings/access";
 import { reviewSchema } from "@/lib/listings/schemas";
 import { periodEndFromSubscription, recordCancellation } from "@/lib/stripe/apply-fee";
 import { getStripe, serverNotConfigured } from "@/lib/stripe/config";
@@ -47,9 +47,6 @@ export async function POST(request: Request, context: Context) {
       hasCover: setup.hasCover,
     });
     if (missing.length > 0) return jsonError(422, "Listing is incomplete", { missing });
-    if (!feeCoversListing(listing, new Date())) {
-      return jsonError(422, "Waive the fee or wait until it is paid before approving");
-    }
     const updated = await supabase
       .from("listings")
       .update({
