@@ -1,7 +1,7 @@
 /**
  * Hand-written types for the FurnishedKeys schema.
- * Source of truth: supabase/migrations/20261011033000_init.sql and
- * supabase/migrations/20261011041000_owner_lead_interest.sql.
+ * Source of truth: supabase/migrations/. The listing fee columns and
+ * listing_payments are added in 20261011053000_listing_subscription.sql.
  *
  * `listings.address_private` is not selectable by anon or authenticated.
  * Use the `listings_public` view, or `listingPublicColumns`, for catalog reads.
@@ -33,6 +33,7 @@ export const listingStatuses = [
   "pending_review",
   "approved",
   "rejected",
+  "changes_requested",
   "archived",
 ] as const;
 export type ListingStatus = (typeof listingStatuses)[number];
@@ -93,16 +94,16 @@ export type Listing = {
   id: string;
   owner_id: string;
   location_id: string;
-  slug: string;
-  title: string;
+  slug: string | null;
+  title: string | null;
   description: string | null;
   property_type: PropertyType;
-  bedrooms: number;
-  bathrooms: number;
-  max_occupants: number;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  max_occupants: number | null;
   pets_allowed: boolean;
   pet_policy: string | null;
-  monthly_rent_cents: number;
+  monthly_rent_cents: number | null;
   min_stay_months: number;
   max_stay_months: number | null;
   amenities: string[];
@@ -114,6 +115,14 @@ export type Listing = {
   status: ListingStatus;
   is_demo: boolean;
   listing_fee_status: ListingFeeStatus;
+  fee_paid_through: string | null;
+  paid_at: string | null;
+  admin_note: string | null;
+  stripe_subscription_id: string | null;
+  /** True when the yearly subscription is set to cancel at period end. */
+  renewal_canceled: boolean;
+  /** Acquisition slug. Default `web`. Owners cannot change it after insert. */
+  source: string;
   reviewed_by: string | null;
   reviewed_at: string | null;
   rejection_reason: string | null;
@@ -121,7 +130,37 @@ export type Listing = {
   updated_at: string;
 };
 
-export type ListingPublic = Omit<Listing, "address_private">;
+export type ListingPrivateField =
+  | "address_private"
+  | "fee_paid_through"
+  | "paid_at"
+  | "admin_note"
+  | "stripe_subscription_id"
+  | "renewal_canceled"
+  | "source";
+
+/** Catalog row. Billing, attribution, the admin note, and the street address are omitted. */
+export type ListingPublic = Omit<Listing, ListingPrivateField>;
+
+export type ListingPaymentStatus =
+  | "paid"
+  | "payment_failed"
+  | "subscription_deleted"
+  | "cancel_scheduled"
+  | "cancel_cleared";
+
+export type ListingPayment = {
+  id: string;
+  listing_id: string;
+  stripe_event_id: string;
+  stripe_session_id: string | null;
+  stripe_invoice_id: string | null;
+  stripe_subscription_id: string | null;
+  amount_cents: number;
+  status: ListingPaymentStatus;
+  period_end: string | null;
+  created_at: string;
+};
 
 export type ListingFee = {
   id: string;
@@ -204,9 +243,15 @@ export type ProfileInsert = WithOptional<
 export type ListingInsert = WithOptional<
   Listing,
   | "id"
+  | "slug"
+  | "title"
   | "description"
+  | "bedrooms"
+  | "bathrooms"
+  | "max_occupants"
   | "pets_allowed"
   | "pet_policy"
+  | "monthly_rent_cents"
   | "min_stay_months"
   | "max_stay_months"
   | "amenities"
@@ -218,11 +263,26 @@ export type ListingInsert = WithOptional<
   | "status"
   | "is_demo"
   | "listing_fee_status"
+  | "fee_paid_through"
+  | "paid_at"
+  | "admin_note"
+  | "stripe_subscription_id"
+  | "renewal_canceled"
+  | "source"
   | "reviewed_by"
   | "reviewed_at"
   | "rejection_reason"
   | "created_at"
   | "updated_at"
+>;
+export type ListingPaymentInsert = WithOptional<
+  ListingPayment,
+  | "id"
+  | "stripe_session_id"
+  | "stripe_invoice_id"
+  | "stripe_subscription_id"
+  | "period_end"
+  | "created_at"
 >;
 export type ListingFeeInsert = WithOptional<ListingFee, "id" | "refundable">;
 export type ListingPhotoInsert = WithOptional<
@@ -270,6 +330,7 @@ export type OwnerLeadInsert = WithOptional<
 export type LocationUpdate = Partial<LocationInsert>;
 export type ProfileUpdate = Partial<Omit<Profile, "id" | "created_at">>;
 export type ListingUpdate = Partial<Omit<Listing, "id" | "created_at">>;
+export type ListingPaymentUpdate = Partial<Omit<ListingPayment, "id" | "created_at">>;
 export type ListingFeeUpdate = Partial<Omit<ListingFee, "id">>;
 export type ListingPhotoUpdate = Partial<Omit<ListingPhoto, "id">>;
 export type AvailabilityWindowUpdate = Partial<Omit<AvailabilityWindow, "id">>;
@@ -277,7 +338,7 @@ export type InquiryUpdate = Partial<Omit<Inquiry, "id" | "created_at">>;
 export type MessageUpdate = Partial<Omit<Message, "id" | "created_at">>;
 export type OwnerLeadUpdate = Partial<Omit<OwnerLead, "id" | "created_at">>;
 
-type ListingPublicColumn = Exclude<keyof Listing, "address_private">;
+type ListingPublicColumn = Exclude<keyof Listing, ListingPrivateField>;
 
 function listingColumns<const T extends readonly ListingPublicColumn[]>(
   columns: Exclude<ListingPublicColumn, T[number]> extends never ? T : never,
@@ -316,8 +377,18 @@ export const listingPublicColumns = listingColumns([
   "updated_at",
 ]);
 
-export const listingFieldNames = [
+export const listingOwnerColumns = [
   ...listingPublicColumns,
+  "fee_paid_through",
+  "paid_at",
+  "admin_note",
+  "stripe_subscription_id",
+  "renewal_canceled",
+  "source",
+] as const;
+
+export const listingFieldNames = [
+  ...listingOwnerColumns,
   "address_private",
 ] as const satisfies readonly (keyof Listing)[];
 
@@ -352,6 +423,11 @@ export type Database = {
       inquiries: Table<Inquiry, InquiryInsert, InquiryUpdate>;
       messages: Table<Message, MessageInsert, MessageUpdate>;
       owner_leads: Table<OwnerLead, OwnerLeadInsert, OwnerLeadUpdate>;
+      listing_payments: Table<
+        ListingPayment,
+        ListingPaymentInsert,
+        ListingPaymentUpdate
+      >;
     };
     Views: {
       listings_public: {
@@ -363,6 +439,25 @@ export type Database = {
       listing_address: {
         Args: { target_listing: string };
         Returns: string | null;
+      };
+      apply_listing_fee_event: {
+        Args: {
+          event_id: string;
+          target_listing: string;
+          session_id: string | null;
+          invoice_id: string | null;
+          subscription_id: string | null;
+          amount_cents: number;
+          payment_status: string;
+          period_end: string | null;
+          update_listing: boolean;
+          next_fee_status: ListingFeeStatus;
+          next_paid_through: string | null;
+          next_paid_at: string | null;
+          next_subscription_id: string | null;
+          next_renewal_canceled: boolean;
+        };
+        Returns: boolean;
       };
     };
     Enums: {
