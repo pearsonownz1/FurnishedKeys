@@ -8,14 +8,18 @@ type Context = { params: Promise<{ id: string }> };
 
 export async function GET(request: Request, context: Context) {
   const { id } = await context.params;
-  const sessionId = new URL(request.url).searchParams.get("session_id");
-  if (!sessionId) return jsonError(400, "session_id is required");
-
   const { supabase, user } = await sessionUser();
   const listing = await loadOwnerListing(supabase, id);
   if (!listing) return jsonError(404, "Listing not found");
   const allowed = requireOwner(user?.id ?? null, listing.owner_id);
   if (!allowed.ok) return accessDenied(allowed);
+
+  if (listing.listing_fee_status === "waived") {
+    return Response.json({ status: "waived", paid_through: listing.fee_paid_through });
+  }
+
+  const sessionId = new URL(request.url).searchParams.get("session_id");
+  if (!sessionId) return jsonError(400, "session_id is required");
 
   const stripe = getStripe();
   if (!stripe) return paymentsNotReady();

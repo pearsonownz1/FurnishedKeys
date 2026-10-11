@@ -54,7 +54,7 @@ The public catalog (and child rows, and public photo reads) shows an approved li
 
 `id`, `listing_id`, `stripe_event_id`, `stripe_session_id`, `stripe_invoice_id`, `stripe_subscription_id`, `amount_cents`, `status`, `period_end`, `created_at`.
 
-`stripe_event_id` is unique. Webhook handling inserts that id and updates the listing in one function, `apply_listing_fee_event`, so a replayed event is a no-op. `status` is `paid | payment_failed | subscription_deleted | cancel_scheduled | cancel_cleared`. The owner reads rows for their listings. Admins read all. Inserts and updates are service role only.
+`stripe_event_id` is unique. Webhook handling inserts that id and updates the listing in one function, `apply_listing_fee_event`, so a replayed event is a no-op. `status` is `paid | payment_failed | subscription_deleted | cancel_scheduled | cancel_cleared | waived_no_stripe`. The owner reads rows for their listings. Admins read all. Inserts and updates are service role only. `waived_no_stripe` is the placeholder row written when checkout runs without `STRIPE_SECRET_KEY`. Its event id is `waived_no_stripe:<listing_id>`.
 
 ### `listing_fees`
 
@@ -166,7 +166,7 @@ Each has utilities, a refundable deposit, and either cleaning or a pet fee, plus
 
 ## Listing fee
 
-The listing fee is **$199 per year**, not a one-time charge. Checkout is Stripe Embedded Checkout (`ui_mode: embedded_page` on the current Stripe API; this is the inline card, name, and ZIP form, not a hosted redirect). `POST /api/listings/[id]/checkout` accepts `{ auto_renew }` (default true) and returns `{ client_secret }`. The return URL is `/owners/listings/{id}/setup?session_id={CHECKOUT_SESSION_ID}`. When `auto_renew` is false, the webhook sets `cancel_at_period_end` on the new subscription. `GET /api/listings/[id]/checkout/status?session_id=` returns `{ status, paid_through }` from Stripe so the setup page can confirm before the webhook lands.
+The listing fee is **$199 per year**, not a one-time charge. When `STRIPE_SECRET_KEY` is set, checkout is Stripe Embedded Checkout (`ui_mode: embedded_page` on the current Stripe API; this is the inline card, name, and ZIP form, not a hosted redirect). `POST /api/listings/[id]/checkout` accepts `{ auto_renew }` (default true) and returns `{ client_secret }`. The return URL is `/owners/listings/{id}/setup?session_id={CHECKOUT_SESSION_ID}`. When `auto_renew` is false, the webhook sets `cancel_at_period_end` on the new subscription. `GET /api/listings/[id]/checkout/status?session_id=` returns `{ status, paid_through }` from Stripe so the setup page can confirm before the webhook lands. A waived listing skips Stripe and that GET returns `{ status: "waived", paid_through }`.
 
 `POST /api/stripe/webhook` checks the signature and is idempotent on the Stripe event id.
 
@@ -175,7 +175,7 @@ The listing fee is **$199 per year**, not a one-time charge. Checkout is Stripe 
 - `invoice.payment_failed` sets the fee unpaid only once `fee_paid_through` has passed.
 - `customer.subscription.deleted` sets the fee unpaid.
 
-If `STRIPE_SECRET_KEY` is missing, checkout, the status read, cancel-renewal, and the webhook return 503 `Payments are not set up yet`. Submit still succeeds when the fee is waived, or paid and `fee_paid_through` is still in the future. A missing price id falls back to `price_data` of 19900 USD with `recurring.interval = year`.
+If `STRIPE_SECRET_KEY` is missing, `POST /api/listings/[id]/checkout` does not return 503. The service role sets `listing_fee_status` to `waived` and `fee_paid_through` to one year from now, inserts a `listing_payments` row with `status` `waived_no_stripe` and `amount_cents` 0, and returns `200` `{ waived: true, paid_through }`. `paid_through` is an ISO timestamp. If the listing is already `paid` or `waived`, the same body is returned and nothing is written (`paid_through` is the stored value, which can be null when an admin waived the fee without a date). Cancel-renewal and the webhook still return 503 `Payments are not set up yet`. Submit already accepts a waived fee. A missing price id, once Stripe is configured, falls back to `price_data` of 19900 USD with `recurring.interval = year`.
 
 Session metadata is `listing_id`, `owner_id`, `source`, and `auto_renew`.
 
@@ -190,8 +190,8 @@ There are no refunds. Rejecting a listing sets `cancel_at_period_end` when Strip
 - `PATCH /api/listings/[id]` — owner, and only `draft`, `rejected`, or `changes_requested`. Optional `availability` replaces windows.
 - `GET /api/listings/[id]` — owner read, including `paid_at`, `admin_note`, and `renewal_canceled`.
 - `POST /api/listings/[id]/photos` — signed upload URLs under `listing-photos/<listing_id>/...`.
-- `POST /api/listings/[id]/checkout` — `{ client_secret }`.
-- `GET /api/listings/[id]/checkout/status?session_id=`
+- `POST /api/listings/[id]/checkout` — `{ client_secret }` when Stripe is configured. Without `STRIPE_SECRET_KEY`, `{ waived: true, paid_through }`.
+- `GET /api/listings/[id]/checkout/status?session_id=` — `{ status, paid_through }`. A waived listing returns `{ status: "waived", paid_through }` and does not need `session_id`.
 - `POST /api/listings/[id]/submit` — does not charge. Requires a current paid or waived fee, otherwise 402 `{ checkout_url }` (that URL is the checkout route above, which returns a client secret). 422 `{ missing }` when title, description, rent, a photo, or an availability window is absent. Resubmitting after `changes_requested` does not charge again while `fee_paid_through` is still in the future.
 - `POST /api/listings/[id]/cancel-renewal` and `DELETE` — owner only. 503 when Stripe is not configured.
 - `POST /api/stripe/webhook`
@@ -206,6 +206,6 @@ Not in this schema:
 
 - **Background checks.** No applicant, screening, or report tables.
 - **Booking and calendar.** `availability_windows` is a confirmed range only. No reservations, leases, or nightly calendar.
-- **Other feature flags.** Background checks and booking stay off. The listing fee is gated by the Stripe env vars, not a flag table.
+- **Other feature flags.** Background checks and booking stay off. Until `STRIPE_SECRET_KEY` is set, checkout records a one-year waiver instead of charging. There is no feature-flag table.
 
 Also later: re-review after an edit to an approved listing, and per-listing assignment of FurnishedKeys managers. `fk_managed` is a label. It does not grant every `manager` profile write access to that listing.

@@ -30,7 +30,7 @@ Copy `.env.example` for local work. Production values are set on the Vercel proj
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY` (server only)
-- `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, optional `STRIPE_LISTING_PRICE_ID`
+- `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, optional `STRIPE_LISTING_PRICE_ID` (without the secret key, checkout waives the fee for one year)
 - `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (Embedded Checkout)
 
 `lib/supabase/client.ts` is the browser client. `lib/supabase/server.ts` is the server client (cookie adapter, no session middleware yet).
