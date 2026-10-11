@@ -16,8 +16,6 @@ import {
 import { getStripe, paymentsNotReady, serverNotConfigured, stripeWebhookSecret } from "@/lib/stripe/config";
 import { createServiceClient } from "@/lib/supabase/service";
 
-export const runtime = "nodejs";
-
 export async function POST(request: Request) {
   const stripe = getStripe();
   const secret = stripeWebhookSecret();
