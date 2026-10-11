@@ -70,9 +70,13 @@ describe("toInquiryInsert", () => {
       new URL("../app/(site)/rentals/actions.ts", import.meta.url),
       "utf8",
     );
-    expect(action).toContain('.from("inquiries").insert(');
+    expect(action).toContain('.from("inquiries")');
+    expect(action).toContain(".insert(");
     expect(action).toContain("logInsertError");
     expect(action).not.toMatch(/\.insert\([\s\S]*?\)\s*\.select\(/);
     expect(action).not.toMatch(/\.single\(/);
+    const insertAt = action.indexOf(".insert(");
+    const emailAt = action.indexOf("await deliverInquiryNotice");
+    expect(emailAt).toBeGreaterThan(insertAt);
   });
 });

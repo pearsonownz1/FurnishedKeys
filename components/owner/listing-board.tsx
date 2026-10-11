@@ -117,7 +117,7 @@ export function ListingBoard({
       ) : (
         <ul className="mt-6 grid gap-4 sm:grid-cols-2">
           {inquiries.map((inquiry) => (
-            <li key={inquiry.id} className="border border-line bg-surface px-5 py-5">
+            <li id={`inquiry-${inquiry.id}`} key={inquiry.id} className="border border-line bg-surface px-5 py-5">
               <p className="text-xs tracking-[0.12em] text-muted uppercase">{inquiry.listingTitle}</p>
               <p className="mt-2 font-semibold">{inquiry.name}</p>
               <p className="mt-2 text-sm leading-relaxed">{inquiry.message}</p>
