@@ -14,8 +14,7 @@ import {
 } from "@/lib/listings";
 import { launchKicker, primaryLocation } from "@/lib/locations";
 import { signedPhotoUrls } from "@/lib/photos";
-import { formatCents } from "@/lib/money";
-import { SELF_LIST_PRICE_CENTS } from "@/lib/pricing";
+import { listingFeeAmount } from "@/lib/pricing";
 
 const steps = [
   {
@@ -97,7 +96,7 @@ export function HomePage() {
               </span>
             </Link>
             <Link
-              href="/list"
+              href="/owners"
               className="flex flex-col justify-between gap-8 bg-surface px-7 py-9 sm:px-11 sm:py-10 lg:flex-row lg:items-end"
             >
               <div>
@@ -170,7 +169,10 @@ export function HomePage() {
                   </p>
                 </div>
                 <p className="font-serif text-[28px] leading-none">
-                  {formatCents(SELF_LIST_PRICE_CENTS)}
+                  {listingFeeAmount()}
+                  <span className="ml-1 font-sans text-lg tracking-normal text-[#c9d5cc]">
+                    /year
+                  </span>
                 </p>
               </div>
               <div className="flex items-center justify-between gap-4 bg-pine-d px-5 py-[18px]">
@@ -180,20 +182,20 @@ export function HomePage() {
                     We handle renters and upkeep
                   </p>
                 </div>
-                <Link href="/management" className="text-sm text-[#c9d5cc]">
+                <Link href="/owners#assessment" className="text-sm text-[#c9d5cc]">
                   Book a consultation
                 </Link>
               </div>
             </div>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link
-                href="/list"
+                href="/owners"
                 className="rounded-[2px] bg-white px-5 py-3.5 text-center text-[15px] font-semibold text-pine-d"
               >
                 List your property
               </Link>
               <Link
-                href="/management"
+                href="/owners#assessment"
                 className="rounded-[2px] border border-white/60 px-5 py-3.5 text-center text-[15px]"
               >
                 Talk to us about management

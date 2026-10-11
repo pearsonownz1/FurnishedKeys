@@ -32,6 +32,19 @@ describe("validateOwnerLead", () => {
     expect(row.source).toBe("letter");
   });
 
+  it("requires an address and a property type", () => {
+    const missing = validateOwnerLead({
+      ...base,
+      propertyAddress: "",
+      propertyType: "",
+    });
+    expect(missing.ok).toBe(false);
+    if (!missing.ok) {
+      expect(missing.fieldErrors.propertyAddress).toBe("Add the property address.");
+      expect(missing.fieldErrors.propertyType).toBe("Choose a property type.");
+    }
+  });
+
   it("omits a skipped interest and an invalid source", () => {
     const row = toOwnerLeadInsert({ ...base, interest: "", source: "Not a slug!" });
     expect(row.interest).toBeNull();

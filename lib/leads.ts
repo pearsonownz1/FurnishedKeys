@@ -68,6 +68,16 @@ export function readOwnerLeadForm(formData: FormData): OwnerLeadInput {
 export function validateOwnerLead(input: OwnerLeadInput): OwnerLeadResult {
   const fieldErrors: Partial<Record<OwnerLeadField, string>> = {};
 
+  if (!input.propertyAddress) {
+    fieldErrors.propertyAddress = "Add the property address.";
+  } else if (input.propertyAddress.length > 500) {
+    fieldErrors.propertyAddress = "Shorten the address.";
+  }
+  if (!input.propertyType) {
+    fieldErrors.propertyType = "Choose a property type.";
+  } else if (!(propertyTypes as readonly string[]).includes(input.propertyType)) {
+    fieldErrors.propertyType = "Choose a property type.";
+  }
   if (input.name.length < 1 || input.name.length > 200) {
     fieldErrors.name = "Add your name.";
   }
@@ -81,12 +91,6 @@ export function validateOwnerLead(input: OwnerLeadInput): OwnerLeadResult {
     fieldErrors.interest = "Choose how you'd like to list.";
   }
   if (
-    input.propertyType &&
-    !(propertyTypes as readonly string[]).includes(input.propertyType)
-  ) {
-    fieldErrors.propertyType = "Choose a property type.";
-  }
-  if (
     input.furnished &&
     !(furnishedLevels as readonly string[]).includes(input.furnished)
   ) {
@@ -97,9 +101,6 @@ export function validateOwnerLead(input: OwnerLeadInput): OwnerLeadResult {
     !activeLocations().some((location) => location.id === input.locationId)
   ) {
     fieldErrors.locationId = "Choose a location.";
-  }
-  if (input.propertyAddress.length > 500) {
-    fieldErrors.propertyAddress = "Shorten the address.";
   }
   if (input.currentUse.length > 200) {
     fieldErrors.currentUse = "Shorten the current use.";

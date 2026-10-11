@@ -1,11 +1,10 @@
 import Link from "next/link";
-import { formatCents } from "@/lib/money";
-import { SELF_LIST_PRICE_CENTS } from "@/lib/pricing";
+import { listingFeeAmount, listingFeePerYear } from "@/lib/pricing";
 
 export const metadata = {
   title: "List your property",
   description:
-    "Reach renters looking for a few months, not a few nights. The listing fee is a one-time charge. Checkout is not open yet.",
+    "Reach renters looking for a few months, not a few nights. The listing fee is billed yearly. Checkout is not open yet.",
 };
 
 export default function ListPage() {
@@ -21,14 +20,14 @@ export default function ListPage() {
       <div className="mt-10 max-w-md border border-line bg-surface px-5 py-5">
         <p className="font-semibold">List it yourself</p>
         <p className="mt-1 text-sm text-muted">
-          One-time fee of {formatCents(SELF_LIST_PRICE_CENTS)} per listing.
-          Checkout is not open yet.
+          {listingFeeAmount()} per listing, per year ({listingFeePerYear()}). Billed
+          yearly and renews automatically. Checkout is not open yet.
         </p>
       </div>
       <p className="mt-8 text-[15px] leading-relaxed text-ink">
-        Prefer someone else to handle renters and upkeep?{" "}
-        <Link href="/management" className="font-semibold text-pine">
-          Talk to us about management
+        Prefer a free rental assessment first?{" "}
+        <Link href="/owners#assessment" className="font-semibold text-pine">
+          Tell us about the property
         </Link>
         .
       </p>

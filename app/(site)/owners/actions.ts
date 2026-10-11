@@ -19,7 +19,7 @@ export async function submitOwnerLead(
   const supabase = await createClient();
   const { error } = await supabase.from("owner_leads").insert(toOwnerLeadInsert(input));
   if (error) {
-    return { ok: false, formError: "We couldn't send that. Please try again." };
+    return { ok: false, formError: "We couldn't send this. Please try again." };
   }
 
   return { ok: true, success: true };

@@ -1,15 +1,45 @@
+import Image from "next/image";
+import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense } from "react";
-import { LeadForm } from "@/components/owners/lead-form";
+import { AssessmentForm } from "@/components/owners/assessment-form";
 import { sanitizeSource } from "@/lib/leads";
+import { ownersKicker, ownersRegionName } from "@/lib/owners-copy";
+import { listMyPropertyLabel, listingFeeAmount } from "@/lib/pricing";
 
 export const metadata = {
-  title: "Owner assessment",
+  title: "List your property",
   description:
-    "Tell Furnished Keys about a home you might list. We'll reply by email. You won't be charged.",
+    "List a furnished home for monthly stays, or ask for a free rental assessment.",
 };
 
 type Search = Record<string, string | string[] | undefined>;
+
+const selfPoints = [
+  "Photos, monthly rent, and every fee (utilities, deposit, cleaning, pets) shown on its own line",
+  "Inquiries come straight to you, and you approve every renter",
+  "Show when your availability was last confirmed so renters trust the dates",
+  "Manage several listings from one owner dashboard",
+] as const;
+
+const managedPoints = [
+  "Listing setup, inquiries and showings",
+  "Screening, leasing and move-ins",
+  "Tenant messages and maintenance coordination",
+] as const;
+
+const renterChips = [
+  "Traveling professionals",
+  "Relocating families",
+  "Contract workers",
+  "Between homes",
+] as const;
+
+const steps = [
+  { n: "01", body: "Tell us about your place." },
+  { n: "02", body: "We review and approve the listing before it goes live." },
+  { n: "03", body: "Renters send inquiries, and you or we take it from there." },
+] as const;
 
 export default function OwnersPage({
   searchParams,
@@ -17,31 +47,176 @@ export default function OwnersPage({
   searchParams: Promise<Search>;
 }) {
   return (
-    <Suspense fallback={<p className="shell py-16 text-muted">Loading…</p>}>
-      <OwnersBody searchParams={searchParams} />
+    <Suspense fallback={<p className="px-5 py-16 text-muted">Loading…</p>}>
+      <OwnersLanding searchParams={searchParams} />
     </Suspense>
   );
 }
 
-async function OwnersBody({ searchParams }: { searchParams: Promise<Search> }) {
+async function OwnersLanding({ searchParams }: { searchParams: Promise<Search> }) {
   await connection();
   const params = await searchParams;
   const raw = params.src;
   const source = sanitizeSource(Array.isArray(raw) ? raw[0] : raw);
+  const listLabel = listMyPropertyLabel();
+  const region = ownersRegionName();
 
   return (
-    <div className="shell max-w-3xl py-14 lg:py-20">
-      <p className="text-xs tracking-[0.14em] text-muted uppercase">For owners</p>
-      <h1 className="mt-4 font-serif text-[clamp(2.5rem,5vw,3.5rem)] leading-[1.05] font-normal tracking-[-0.8px]">
-        Tell us about the home
-      </h1>
-      <p className="mt-5 max-w-xl text-[17px] leading-relaxed text-muted">
-        A short assessment is enough to start. Share how you&apos;d like to list,
-        and we&apos;ll reply by email.
-      </p>
-      <div className="mt-10">
-        <LeadForm source={source} />
-      </div>
+    <div>
+      <section className="grid bg-stone lg:min-h-[620px] lg:grid-cols-2">
+        <div className="flex flex-col justify-center px-5 py-14 sm:px-10 lg:py-20 lg:pr-16 lg:pl-[max(2rem,calc((100vw-1200px)/2))]">
+          <p className="text-xs tracking-[0.14em] text-muted uppercase">{ownersKicker()}</p>
+          <h1 className="mt-4 max-w-[14ch] font-serif text-[clamp(2.75rem,6vw,5.25rem)] leading-[0.95] font-normal tracking-[-1px]">
+            Your furnished space,{" "}
+            <span className="text-pine italic">rented by the month.</span>
+          </h1>
+          <p className="mt-5 max-w-[36rem] text-[17px] leading-relaxed text-ink">
+            List your ADU, apartment, room, or house for monthly stays in {region}, or have us
+            handle it for you.
+          </p>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <Link
+              href="/list"
+              className="rounded-[2px] bg-pine px-5 py-3.5 text-center text-[15px] font-semibold text-white"
+            >
+              {listLabel}
+            </Link>
+            <a
+              href="#assessment"
+              className="rounded-[2px] border border-ink px-5 py-3.5 text-center text-[15px]"
+            >
+              Get a free rental assessment
+            </a>
+          </div>
+          <p className="mt-5 flex items-start gap-2 text-sm text-ok">
+            <span aria-hidden="true" className="mt-1.5 size-1.5 shrink-0 rounded-full bg-ok" />
+            We only publish a property after its owner submits and approves it.
+          </p>
+        </div>
+        <div className="relative min-h-[260px]">
+          <Image
+            src="/demo/p1.jpg"
+            alt="A dark modern ADU set among pines and rock"
+            fill
+            priority
+            sizes="(min-width: 1024px) 50vw, 100vw"
+            className="object-cover"
+          />
+        </div>
+      </section>
+
+      <section className="shell py-16 lg:py-24">
+        <h2 className="font-serif text-[clamp(2.25rem,4vw,3.25rem)] leading-[1.05] font-normal tracking-[-0.6px]">
+          Two ways to work with us
+        </h2>
+        <div className="mt-8 grid gap-px bg-line lg:grid-cols-2">
+          <article className="bg-surface px-6 py-10 sm:px-11">
+            <p className="text-xs tracking-[0.14em] text-muted uppercase">List it yourself</p>
+            <h3 className="mt-3 font-serif text-[clamp(1.75rem,3vw,2.25rem)] leading-none font-normal">
+              Your listing, your renters
+            </h3>
+            <p className="mt-6 font-serif text-[56px] leading-none text-pine">{listingFeeAmount()}</p>
+            <p className="mt-1 text-sm text-muted">per listing, per year</p>
+            <ul className="mt-8">
+              {selfPoints.map((point) => (
+                <li key={point} className="border-t border-line py-3 text-[15px] leading-relaxed">
+                  <span className="text-pine" aria-hidden="true">
+                    —{" "}
+                  </span>
+                  {point}
+                </li>
+              ))}
+            </ul>
+            <Link
+              href="/list"
+              className="mt-8 inline-block rounded-[2px] bg-pine px-5 py-3.5 text-[15px] font-semibold text-white"
+            >
+              {listLabel}
+            </Link>
+          </article>
+          <article className="bg-pine-d px-6 py-10 text-white sm:px-11">
+            <p className="text-xs tracking-[0.14em] text-[#b9c9bd] uppercase">
+              Furnished Keys managed
+            </p>
+            <h3 className="mt-3 font-serif text-[clamp(1.75rem,3vw,2.25rem)] leading-none font-normal">
+              We handle it for you
+            </h3>
+            <p className="mt-6 text-[22px] leading-snug text-[#c9d5cc]">
+              Pricing set in your free assessment
+            </p>
+            <ul className="mt-8">
+              {managedPoints.map((point) => (
+                <li key={point} className="border-t border-white/15 py-3 text-[15px] leading-relaxed">
+                  <span className="text-[#c9d5cc]" aria-hidden="true">
+                    —{" "}
+                  </span>
+                  {point}
+                </li>
+              ))}
+            </ul>
+            <a
+              href="#assessment"
+              className="mt-8 inline-block rounded-[2px] bg-white px-5 py-3.5 text-[15px] font-semibold text-pine-d"
+            >
+              Get a free rental assessment
+            </a>
+          </article>
+        </div>
+      </section>
+
+      <section className="border-t border-line">
+        <div className="shell grid gap-8 py-16 lg:grid-cols-[minmax(0,420px)_1fr] lg:py-20">
+          <h2 className="font-serif text-[clamp(2.25rem,4vw,3.25rem)] leading-[1.05] font-normal tracking-[-0.6px]">
+            Who&apos;s renting
+          </h2>
+          <div>
+            <p className="max-w-[40rem] text-[17px] leading-relaxed">
+              Traveling professionals, families relocating to the area, contract workers, and
+              people between homes who need a furnished place for a few months, without a
+              year-long lease.
+            </p>
+            <ul className="mt-6 flex flex-wrap gap-2">
+              {renterChips.map((chip) => (
+                <li key={chip} className="rounded-[2px] border border-line px-3 py-1.5 text-sm">
+                  {chip}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section className="border-t border-line">
+        <div className="shell py-16 lg:py-20">
+          <h2 className="font-serif text-[clamp(2.25rem,4vw,3.25rem)] leading-[1.05] font-normal tracking-[-0.6px]">
+            How it works
+          </h2>
+          <ol className="mt-8 grid list-none gap-8 border-t border-ink lg:grid-cols-3">
+            {steps.map((step) => (
+              <li key={step.n} className="pt-6">
+                <p className="font-serif text-[2.75rem] text-pine italic">{step.n}</p>
+                <p className="mt-2 max-w-[28ch] text-[17px] leading-relaxed">{step.body}</p>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </section>
+
+      <section id="assessment" className="bg-stone">
+        <div className="shell grid gap-10 py-16 lg:grid-cols-[minmax(0,440px)_1fr] lg:py-20">
+          <div>
+            <p className="text-xs tracking-[0.14em] text-muted uppercase">Free, no obligation</p>
+            <h2 className="mt-3 font-serif text-[clamp(2.25rem,4vw,3.25rem)] leading-[1.05] font-normal tracking-[-0.6px]">
+              Get a rental assessment
+            </h2>
+            <p className="mt-4 max-w-md text-[17px] leading-relaxed text-muted">
+              Tell us about the property and we&apos;ll follow up with what it could rent for and
+              how we&apos;d work together.
+            </p>
+          </div>
+          <AssessmentForm source={source} />
+        </div>
+      </section>
     </div>
   );
 }
