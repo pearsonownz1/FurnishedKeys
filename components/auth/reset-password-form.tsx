@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { useHydrated } from "@/components/auth/use-hydrated";
+import { dashboardForRole } from "@/lib/auth-redirect";
 import { createClient } from "@/lib/supabase/client";
 
 const fieldClass =
@@ -38,7 +39,7 @@ export function ResetPasswordForm({ hasSession }: { hasSession: boolean }) {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (password.length < 8) {
-      setError("Use at least 8 characters.");
+      setError("Password needs at least 8 characters");
       return;
     }
     if (password !== confirm) {
@@ -56,13 +57,16 @@ export function ResetPasswordForm({ hasSession }: { hasSession: boolean }) {
         setPending(false);
         return;
       }
+      const { data } = await supabase.auth.getUser();
+      const profile = data.user
+        ? await supabase.from("profiles").select("role").eq("id", data.user.id).maybeSingle()
+        : null;
+      router.push(dashboardForRole(profile?.data?.role));
     } catch (caught) {
       console.error("reset-password", caught);
       setError("We couldn't update the password. Request a new link.");
       setPending(false);
-      return;
     }
-    router.push("/owner");
   }
 
   return (

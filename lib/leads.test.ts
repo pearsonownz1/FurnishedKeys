@@ -76,7 +76,7 @@ describe("owner lead insert", () => {
     expect(FREE_TO_LIST).toBe("Free to list. We only earn when you rent.");
 
     const page = readFileSync(new URL("../app/(site)/owners/page.tsx", import.meta.url), "utf8");
-    const start = readFileSync(new URL("../components/listing/start-form.tsx", import.meta.url), "utf8");
+    const start = readFileSync(new URL("../components/auth/signup-form.tsx", import.meta.url), "utf8");
     const form = readFileSync(new URL("../components/owners/assessment-form.tsx", import.meta.url), "utf8");
     for (const phrase of [
       "Your furnished space",
@@ -88,7 +88,7 @@ describe("owner lead insert", () => {
       "Get a rental assessment",
       "listMyPropertyLabel()",
       "FREE_TO_LIST",
-      "/owners/start?src=",
+      "/signup?src=",
       "<AssessmentForm source={source} />",
     ]) {
       expect(page).toContain(phrase);

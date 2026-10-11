@@ -5,7 +5,7 @@ import { Suspense } from "react";
 import { ListingCard } from "@/components/listing-card";
 import { SearchBar, SearchBarSkeleton } from "@/components/search-bar";
 import { SiteFooter } from "@/components/site-footer";
-import { SiteHeader } from "@/components/site-header";
+import { AccountHeader } from "@/components/account-header";
 import { brand } from "@/lib/brand";
 import {
   getPublicListings,
@@ -52,7 +52,9 @@ export function HomePage() {
             />
             <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(18,24,20,0.78)_0%,rgba(18,24,20,0.46)_46%,rgba(18,24,20,0.12)_100%)]" />
             <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(18,24,20,0.38)_0%,transparent_28%)]" />
-            <SiteHeader tone="overlay" />
+            <Suspense fallback={null}>
+              <AccountHeader tone="overlay" />
+            </Suspense>
             <div className="shell relative z-10 flex h-full flex-col justify-end pt-28 pb-24 lg:justify-start lg:pt-[168px] lg:pb-0">
               <p className="fk-rise text-xs tracking-[0.14em] uppercase">
                 {launchKicker(market)}

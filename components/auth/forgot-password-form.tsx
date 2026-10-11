@@ -40,14 +40,9 @@ export function ForgotPasswordForm({ notice }: { notice: string }) {
 
   if (sent) {
     return (
-      <div role="status">
-        <h1 className="font-serif text-[clamp(2.5rem,5vw,3.5rem)] leading-none font-normal tracking-[-0.8px]">
-          Check your email
-        </h1>
-        <p className="mt-5 max-w-xl text-[17px] leading-relaxed text-muted">
-          If an account exists for that address, a reset link is on its way.
-        </p>
-      </div>
+      <p role="status" className="max-w-xl text-[17px] leading-relaxed">
+        If that email has an account, we sent a reset link.
+      </p>
     );
   }
 

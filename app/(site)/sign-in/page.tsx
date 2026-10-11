@@ -1,7 +1,7 @@
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { SignInForm } from "@/components/auth/sign-in-form";
-import { safeNext } from "@/lib/auth-redirect";
+import { requestedNext } from "@/lib/auth-redirect";
 
 export const metadata = {
   title: "Sign in",
@@ -22,7 +22,7 @@ async function SignIn({ searchParams }: { searchParams: Promise<Search> }) {
   await connection();
   const params = await searchParams;
   const raw = params.next;
-  const next = safeNext(Array.isArray(raw) ? raw[0] : raw);
+  const next = requestedNext(Array.isArray(raw) ? raw[0] : raw);
   const notice =
     params.error === "link" ? "That link didn't work. Request a new one from forgot password." : "";
 

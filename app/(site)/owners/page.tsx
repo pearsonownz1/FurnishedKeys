@@ -52,7 +52,7 @@ async function OwnersLanding({ searchParams }: { searchParams: Promise<Search> }
   const raw = params.src;
   const source = sanitizeSource(Array.isArray(raw) ? raw[0] : raw);
   const listLabel = listMyPropertyLabel();
-  const startHref = source ? `/owners/start?src=${encodeURIComponent(source)}` : "/owners/start";
+  const startHref = source ? `/signup?src=${encodeURIComponent(source)}` : "/signup";
   const region = ownersRegionName();
 
   return (

@@ -4,51 +4,52 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { useHydrated } from "@/components/auth/use-hydrated";
-import { safeNext } from "@/lib/auth-redirect";
+import { dashboardForRole } from "@/lib/auth-redirect";
 import { createClient } from "@/lib/supabase/client";
 
 const fieldClass =
   "h-[46px] w-full rounded-[2px] border border-line bg-surface px-3 text-[15px]";
 
-const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-export function SignInForm({ next, notice }: { next: string; notice: string }) {
+export function SignInForm({ next, notice }: { next: string | null; notice: string }) {
   const router = useRouter();
   const hydrated = useHydrated();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [pending, setPending] = useState(false);
   const [fieldError, setFieldError] = useState<string | null>(null);
-  const destination = safeNext(next);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const address = email.trim();
-    if (!emailPattern.test(address) || password.length < 8) {
-      setFieldError("Add your email and password.");
+    if (!address || !password) {
+      setFieldError("Wrong email or password");
       return;
     }
     setPending(true);
     setFieldError(null);
     try {
       const supabase = createClient();
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: address,
         password,
       });
-      if (error) {
-        console.error("sign-in", error.message);
-        setFieldError("Email or password is incorrect.");
+      if (error || !data.user) {
+        console.error("sign-in", error?.message);
+        setFieldError("Wrong email or password");
         setPending(false);
         return;
       }
+      if (next) {
+        router.push(next);
+        return;
+      }
+      const profile = await supabase.from("profiles").select("role").eq("id", data.user.id).maybeSingle();
+      router.push(dashboardForRole(profile.data?.role));
     } catch (error) {
       console.error("sign-in", error);
-      setFieldError("Email or password is incorrect.");
+      setFieldError("Wrong email or password");
       setPending(false);
-      return;
     }
-    router.push(destination);
   }
 
   return (
@@ -102,6 +103,11 @@ export function SignInForm({ next, notice }: { next: string; notice: string }) {
       <p className="mt-4 text-sm">
         <Link href="/forgot-password" className="font-semibold text-pine">
           Forgot password?
+        </Link>
+      </p>
+      <p className="mt-2 text-sm">
+        <Link href="/signup" className="font-semibold text-pine">
+          Create an account
         </Link>
       </p>
     </form>
