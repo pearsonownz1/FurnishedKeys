@@ -155,10 +155,10 @@ Management consultation form.
 
 - `furnished`: `yes | partly | no`
 - `interest`: `list_myself | full_management | not_sure`. Nullable, no default. Added by `20261011041000_owner_lead_interest.sql`.
-- `status`: `new | contacted | closed`, default `new`
+- `status`: `new | contacted | qualified | onboarded | closed`, default `new`. `qualified` and `onboarded` were added by `20261011203437_admin_console.sql`.
 - `source`: short slug, default `web`. The format check `^[a-z0-9_-]{1,40}$` accepts `web`, `mailer`, and `letter`. It is not a closed list.
 
-Anyone can insert a new, unassigned lead, including `interest` and `source`. The insert policy only requires `status = new` and `assigned_to` null, and the insert grant is table-level, so both columns are writable. Visitors cannot read the row back. `manager` and `admin` profiles can read and update the inbox. `assigned_to` must be a manager or admin.
+Anyone can insert a new, unassigned lead, including `interest` and `source`. The insert policy only requires `status = new` and `assigned_to` null, and the insert grant is table-level, so both columns are writable. Visitors cannot read the row back. `manager` and `admin` profiles can read the inbox. Updates are admin only. `assigned_to` must be a manager or admin.
 
 After a successful insert, `submitOwnerLead` emails `LEADS_NOTIFY_TO` or, when that is unset, `guy@gcs.org`. The subject is `New owner lead: <interest> – <property address>`. Every field in the HTML is escaped. Reply-To is the lead's email. A mail failure is logged. The action still returns `{ ok: true, success: true }`.
 
@@ -193,7 +193,7 @@ RLS is enabled and forced on every table above. `anon` is a signed-out Data API 
 | `listing_fees`, `listing_photos`, `listing_bedrooms`, `listing_blocked_dates`, `availability_windows` | select when the listing is publicly visible | same, plus full CRUD on children of own listings | all |
 | `inquiries` | insert only | insert; select own (`renter_id`), assigned, or owned-listing inquiries; update status/assignee on owned or assigned inquiries | all |
 | `messages` | none | select on inquiries they can read; insert only an `owner` row as themselves | all, including delete |
-| `owner_leads` | insert only | insert; managers read/update the inbox; assignees read/update their rows | all |
+| `owner_leads` | insert only | insert; managers and assignees can read. Updates are admin only | all |
 
 There is no public read of `profiles`, so owner phone and email are not on the catalog. Contact goes through an inquiry.
 
@@ -256,7 +256,7 @@ There are no refunds. Rejecting a listing sets `cancel_at_period_end` when Strip
 - `POST /api/listings/[id]/submit` — does not charge and does not check the fee. 422 `{ missing }` lists any of `title`, `description`, `rent`, `min_stay`, `bedroom`, `bathrooms`, `photo`, and `cover` that are absent. If photos exist and none is the cover, submit marks the first by `sort` before that check. A complete listing becomes `pending_review`. After that status write, the server calls `revalidatePath` on `/rentals/<slug>`, `/rentals`, and `/`.
 - `POST /api/listings/[id]/cancel-renewal` and `DELETE` — owner only. 503 when Stripe is not configured.
 - `POST /api/stripe/webhook`
-- `POST /api/admin/listings/[id]/review` — `{ action: approve | request_changes | reject, note? }`. `note` is required for request changes and reject. Approve sets `approved` when the same completeness list is empty, with no fee check. Request changes sets `changes_requested`. Reject sets `rejected` and cancels renewal at period end when Stripe is configured. After each successful status write, the server calls `revalidatePath` on `/rentals/<slug>` (when the listing has a slug), `/rentals`, and `/`, then emails the owner: approved, changes requested (the note is in the message), or rejected (the note is in the message). A mail failure does not change the JSON response. `EMAIL_FROM` is the From address. With no `RESEND_API_KEY`, the email is logged and not sent. Addresses ending in `.example` are not sent.
+- `POST /api/admin/listings/[id]/review` — `{ action: approve | request_changes | reject, note? }`. `note` is required for request changes and optional for reject. It is 1–4000 characters. Approve sets `approved` when the same completeness list is empty, with no fee check. Request changes sets `changes_requested`. Reject sets `rejected` and cancels renewal at period end when Stripe is configured. After each successful status write, the server calls `revalidatePath` on `/rentals/<slug>` (when the listing has a slug), `/rentals`, and `/`, then emails the owner: approved, changes requested (the note is in the message), or rejected (the note is in the message). Mail is skipped when `notify_listing_status` is false. A mail failure does not change the JSON response. `EMAIL_FROM` is the From address. With no `RESEND_API_KEY`, the email is logged and not sent. Addresses ending in `.example` are not sent.
 - `POST /api/admin/listings/[id]/waive` — sets `listing_fee_status = waived`. Admin only.
 
 Front end Embedded Checkout needs `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`. The webhook endpoint to register is `https://furnishedkeys.com/api/stripe/webhook`.
@@ -293,6 +293,29 @@ Front End builds the Listings, Inquiries, Calendar, and Settings screens. These 
 | `changePassword` | `app/(site)/owner/settings-actions.ts` | `(prev, formData{current_password, new_password})` | `{ ok, success?, formError?, fieldErrors? }`. `new_password` is 8–72 characters. `signInWithPassword` runs first, then `updateUser`. |
 
 `/inquiry/[token]` is the only new page. It shows the listing title, the original inquiry, then messages oldest first, and a reply box. The public property calendar already renders blocked days from `listing_blocked_dates`. An inquiry whose nights overlap a blocked day is rejected with "Those dates include a blocked day."
+
+## Admin console loaders and actions
+
+Front End builds the admin screens. These are the server contracts. A caller who is not `profiles.role = 'admin'` makes a loader call `forbidden()` (HTTP 403). Actions return `{ ok: false, formError: "Admins only." }`. After the gate, reads and writes use the service-role client. `rent` is monthly rent in cents.
+
+The review checklist is informational. Approve still uses the submit list (`title`, `description`, `rent`, `min_stay`, `bedroom`, `bathrooms`, `photo`, `cover`). Checklist keys: `photos` (at least 5), `cover`, `description` (trimmed length at least 1, the submit minimum), `rent`, `fees` (at least one `listing_fees` row), `availability` (at least one window), `amenities`, `house_rules`, `address` (street address and both map coordinates).
+
+| Export | File | Args | Returns |
+| --- | --- | --- | --- |
+| `loadAdminCounts` | `lib/admin-load.ts` | none | `{ review_waiting, leads_new, listings_live, listings_total, inquiries_7d, owners_total }`. `review_waiting` is `pending_review`. `leads_new` is `owner_leads.status = new`. `listings_live` is `approved`. `inquiries_7d` counts inquiries created in the last 7 days. `owners_total` counts `profiles.role = owner`. |
+| `loadReviewQueue` | `lib/admin-load.ts` | none | `pending_review` rows, oldest `submitted_at` first. Each: `id`, `title`, `owner_name`, `owner_email`, `city`, `submitted_at`, `cover_url` (signed, or null), `rent`, `beds`, `baths`, `sqft`, `checklist: { key, label, ok }[]`. |
+| `loadRecentActivity` | `lib/admin-load.ts` | `limit = 20` (capped at 50) | `{ kind, label, at, href }[]`, newest first. `kind` is `listing_submitted`, `listing_approved`, `inquiry`, `owner_lead`, or `signup`. Hrefs: `/admin/listings/<id>`, `/admin/inquiries/<id>`, `/admin/leads/<id>`, `/admin/users`. |
+| `loadAdminListings` | `lib/admin-load.ts` | `{ status? }` | Rows: `id`, `title`, `status`, `owner_name`, `owner_email`, `city`, `rent`, `beds`, `baths`, `sqft`, `submitted_at`, `updated_at`. An unknown status returns `[]`. |
+| `loadOwnerLeads` | `lib/admin-load.ts` | `{ status? }` | Rows: `id`, `source`, `source_label`, `status`, `notes`, `interest`, `name`, `email`, `phone`, `address`, `created_at`. `source_label` is `Letter (QR)` when `source` is `letter`, otherwise `/owners`. |
+| `loadAdminInquiries` | `lib/admin-load.ts` | none | Rows: `id`, `listing_id`, `listing_title`, `name`, `email`, `phone`, `status`, `move_in`, `move_out`, `message`, `created_at`. |
+| `loadAdminUsers` | `lib/admin-load.ts` | none | Rows: `id`, `full_name`, `email`, `role`, `listings_count`, `created_at`, `last_sign_in_at`. |
+| `approveListing` | `app/(site)/admin/actions.ts` | `(id)` | `{ ok, success?, formError? }`. Same approve rules, revalidation, and owner email as the review route. Incomplete: `{ ok: false, formError: "Listing is incomplete" }`. |
+| `requestChanges` | `app/(site)/admin/actions.ts` | `(prev, formData{listingId, note})` | `{ ok, success?, formError? }`. `note` is 1–4000 characters. Sets `changes_requested`, stores the note, revalidates public pages, and emails the owner when `notify_listing_status` is not false. Empty or oversized note: `{ ok: false, formError: "Write a note between 1 and 4000 characters." }`. |
+| `rejectListing` | `app/(site)/admin/actions.ts` | `(prev, formData{listingId, note?})` | `{ ok, success?, formError? }`. `note` is optional, at most 4000 characters. Sets `rejected`, revalidates, and emails the owner. |
+| `updateLeadStatus` | `app/(site)/admin/actions.ts` | `(leadId, status)` | `{ ok, success?, formError? }`. `status` is `new`, `contacted`, `qualified`, `onboarded`, or `closed`. Unknown status: `{ ok: false, formError: "Pick a lead status." }`. Missing lead: `{ ok: false, formError: "That lead is not in the inbox." }`. |
+| `updateLeadNotes` | `app/(site)/admin/actions.ts` | `(leadId, notes)` | `{ ok, success?, formError? }`. Empty notes clear the column. Over 8000 characters: `{ ok: false, formError: "Keep notes under 8000 characters." }`. |
+
+`listings.submitted_at` is stamped when a listing moves to `pending_review`. Existing pending rows were backfilled from `updated_at`.
 
 ## Deferred
 

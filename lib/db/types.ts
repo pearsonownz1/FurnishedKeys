@@ -61,7 +61,13 @@ export type InquiryStatus = (typeof inquiryStatuses)[number];
 export const furnishedLevels = ["yes", "partly", "no"] as const;
 export type FurnishedLevel = (typeof furnishedLevels)[number];
 
-export const ownerLeadStatuses = ["new", "contacted", "closed"] as const;
+export const ownerLeadStatuses = [
+  "new",
+  "contacted",
+  "qualified",
+  "onboarded",
+  "closed",
+] as const;
 export type OwnerLeadStatus = (typeof ownerLeadStatuses)[number];
 
 export const ownerLeadInterests = [
@@ -144,6 +150,8 @@ export type Listing = {
   reviewed_by: string | null;
   reviewed_at: string | null;
   rejection_reason: string | null;
+  /** When the listing last moved to pending_review. */
+  submitted_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -156,7 +164,8 @@ export type ListingPrivateField =
   | "stripe_subscription_id"
   | "renewal_canceled"
   | "source"
-  | "setup_step";
+  | "setup_step"
+  | "submitted_at";
 
 /** Catalog row. Billing, attribution, the admin note, and the street address are omitted. */
 export type ListingPublic = Omit<Listing, ListingPrivateField>;
@@ -344,6 +353,7 @@ export type ListingInsert = WithOptional<
   | "reviewed_by"
   | "reviewed_at"
   | "rejection_reason"
+  | "submitted_at"
   | "created_at"
   | "updated_at"
 >;
