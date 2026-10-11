@@ -1,14 +1,30 @@
-import Link from "next/link";
+import { connection } from "next/server";
 import { Suspense } from "react";
-import { ListingCard } from "@/components/listing-card";
-import { filterListings, getPublicListings } from "@/lib/listings";
-import { locationBySlug, primaryLocation } from "@/lib/locations";
-import { formatMonthDay, parseListingQuery } from "@/lib/search";
+import { BrowseBoard } from "@/components/browse/browse-board";
+import type { BrowseItem } from "@/components/browse/listing-row";
+import { FilterBar } from "@/components/browse/filter-bar";
+import {
+  browseMeta,
+  confirmationLabel,
+  filterListings,
+  formatBrowseFee,
+  getPublicListings,
+  latestConfirmedAt,
+  minStayTag,
+  orderedFees,
+  petTag,
+  primaryPhoto,
+  sortByRecentConfirmation,
+} from "@/lib/listings";
+import { locationBySlug } from "@/lib/locations";
+import { formatCents } from "@/lib/money";
+import { signedPhotoUrls } from "@/lib/photos";
+import { moveInOptions, parseListingQuery, type BrowseView } from "@/lib/search";
 
 type Search = Record<string, string | string[] | undefined>;
 
 export const metadata = {
-  title: "Find a home",
+  title: "Furnished rentals",
   description: "Furnished homes for monthly and extended stays.",
 };
 
@@ -18,7 +34,7 @@ export default function RentalsPage({
   searchParams: Promise<Search>;
 }) {
   return (
-    <Suspense fallback={<p className="shell py-16 text-muted">Loading homes…</p>}>
+    <Suspense fallback={<p className="px-5 py-16 text-muted md:px-8">Loading homes…</p>}>
       <RentalsResults searchParams={searchParams} />
     </Suspense>
   );
@@ -29,50 +45,60 @@ async function RentalsResults({
 }: {
   searchParams: Promise<Search>;
 }) {
+  await connection();
   const query = parseListingQuery(await searchParams);
-  const place = (query.where && locationBySlug(query.where)) || primaryLocation();
-  const listings = filterListings(getPublicListings(), query);
-  const summary = describeQuery(query, place.name);
+  const view: BrowseView = query.view ?? "split";
+  let catalogError = false;
+  let items: BrowseItem[] = [];
+
+  try {
+    const listings = sortByRecentConfirmation(
+      filterListings(await getPublicListings(), query),
+    );
+    const photos = await signedPhotoUrls(listings);
+    items = listings.map((listing) => {
+      const photo = primaryPhoto(listing);
+      const confirmed = latestConfirmedAt(listing.availability_windows);
+      return {
+        id: listing.id,
+        slug: listing.slug,
+        title: listing.title,
+        meta: browseMeta(listing),
+        rent: formatCents(listing.monthly_rent_cents),
+        fees: orderedFees(listing.fees).map(formatBrowseFee),
+        tags: [minStayTag(listing.min_stay_months), petTag(listing)],
+        confirmed: confirmed ? confirmationLabel(confirmed) : null,
+        imageUrl: photo ? (photos.get(photo.storage_path) ?? null) : null,
+        imageAlt: photo?.caption ?? listing.title,
+        isDemo: listing.is_demo,
+        lat: listing.approx_lat,
+        lng: listing.approx_lng,
+        priceLabel: formatCents(listing.monthly_rent_cents),
+      };
+    });
+  } catch {
+    catalogError = true;
+  }
+
+  const place = query.where ? locationBySlug(query.where) : undefined;
+  const title = place ? `Furnished rentals in ${place.name}` : "Furnished rentals";
+  const noun = items.length === 1 ? "listing" : "listings";
+  const demoNoun = items.length === 1 ? "demo listing" : "demo listings";
+  const allDemo = items.length > 0 && items.every((item) => item.isDemo);
+  const summary = catalogError
+    ? "Catalog unavailable"
+    : `${items.length} ${allDemo ? demoNoun : noun} · Sorted by recently confirmed`;
 
   return (
-    <div className="shell py-12 lg:py-16">
-      <h1 className="font-serif text-[clamp(2.5rem,5vw,3.5rem)] leading-none font-normal tracking-[-0.8px]">
-        Homes in {place.name}
-      </h1>
-      <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-muted">{summary}</p>
-      {query.view === "map" ? (
-        <p className="mt-6 max-w-xl border border-line bg-surface px-4 py-3 text-sm text-ink">
-          The map opens with a later release. Matching homes are listed below.
-        </p>
-      ) : null}
-      {listings.length === 0 ? (
-        <p className="mt-12 text-ink">
-          No homes match that search yet.{" "}
-          <Link href="/rentals" className="font-semibold text-pine">
-            Clear filters
-          </Link>
-        </p>
-      ) : (
-        <div className="mt-10 grid gap-7 lg:grid-cols-3">
-          {listings.map((listing) => (
-            <ListingCard key={listing.id} listing={listing} />
-          ))}
-        </div>
-      )}
+    <div>
+      <FilterBar key={summary + view + (query.where ?? "")} query={query} moveIns={moveInOptions(new Date())} />
+      <BrowseBoard
+        items={items}
+        title={title}
+        summary={summary}
+        view={view}
+        catalogError={catalogError}
+      />
     </div>
   );
-}
-
-function describeQuery(
-  query: ReturnType<typeof parseListingQuery>,
-  placeName: string,
-): string {
-  const bits = [`Showing furnished homes around ${placeName}`];
-  if (query.moveIn) bits.push(`moving in ${formatMonthDay(query.moveIn)}`);
-  if (query.stayMonths) {
-    bits.push(
-      `for ${query.stayMonths} ${query.stayMonths === 1 ? "month" : "months"}`,
-    );
-  }
-  return `${bits.join(", ")}. Rent, utilities, and deposits are listed separately.`;
 }

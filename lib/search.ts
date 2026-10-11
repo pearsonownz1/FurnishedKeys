@@ -26,12 +26,19 @@ export const budgetOptions: BudgetOption[] = [
 export const DEFAULT_STAY_MONTHS = "3";
 export const DEFAULT_BUDGET_CENTS = "250000";
 
+export type BrowseView = "list" | "split" | "map";
+
 export type ListingQuery = {
   where?: string;
   moveIn?: string;
   stayMonths?: number;
   budgetCents?: number;
-  view?: string;
+  view?: BrowseView;
+  type?: "adu" | "apartment" | "room" | "house" | "other";
+  bedroomsMin?: number;
+  studioOnly?: boolean;
+  pets?: boolean;
+  minStay?: number;
 };
 
 export function defaultMoveIn(now = new Date()): string {
@@ -77,12 +84,71 @@ export function parseListingQuery(
   const stay = Number(firstParam(raw.stay_months));
   const budget = Number(firstParam(raw.budget_cents));
   const moveIn = firstParam(raw.move_in);
+  const minStay = Number(firstParam(raw.min_stay));
+  const beds = firstParam(raw.beds);
+  const type = firstParam(raw.type);
+  const view = firstParam(raw.view);
+  const where = firstParam(raw.where);
+  const propertyTypes = ["adu", "apartment", "room", "house", "other"] as const;
+  const views = ["list", "split", "map"] as const;
+  const query: ListingQuery = {};
 
-  return {
-    where: firstParam(raw.where),
-    moveIn: moveIn && /^\d{4}-\d{2}-\d{2}$/.test(moveIn) ? moveIn : undefined,
-    stayMonths: Number.isFinite(stay) && stay > 0 ? stay : undefined,
-    budgetCents: Number.isFinite(budget) && budget > 0 ? budget : undefined,
-    view: firstParam(raw.view),
-  };
+  if (where) query.where = where;
+  if (moveIn && /^\d{4}-\d{2}-\d{2}$/.test(moveIn)) query.moveIn = moveIn;
+  if (Number.isFinite(stay) && stay > 0) query.stayMonths = stay;
+  if (Number.isFinite(budget) && budget > 0) query.budgetCents = budget;
+  const parsedView = views.find((item) => item === view);
+  if (parsedView) query.view = parsedView;
+  const parsedType = propertyTypes.find((item) => item === type);
+  if (parsedType) query.type = parsedType;
+  if (beds === "studio") query.studioOnly = true;
+  else if (beds && Number(beds) > 0) query.bedroomsMin = Number(beds);
+  if (firstParam(raw.pets) === "1") query.pets = true;
+  if (Number.isFinite(minStay) && minStay > 0) query.minStay = minStay;
+
+  return query;
+}
+
+export function listingQueryString(query: ListingQuery): string {
+  const params = new URLSearchParams();
+  if (query.where) params.set("where", query.where);
+  if (query.moveIn) params.set("move_in", query.moveIn);
+  if (query.stayMonths) params.set("stay_months", String(query.stayMonths));
+  if (query.budgetCents) params.set("budget_cents", String(query.budgetCents));
+  if (query.type) params.set("type", query.type);
+  if (query.studioOnly) params.set("beds", "studio");
+  else if (query.bedroomsMin) params.set("beds", String(query.bedroomsMin));
+  if (query.pets) params.set("pets", "1");
+  if (query.minStay) params.set("min_stay", String(query.minStay));
+  if (query.view) params.set("view", query.view);
+  const value = params.toString();
+  return value ? `?${value}` : "";
+}
+
+export function addMonths(isoDate: string, months: number): string {
+  const [year, month, day] = isoDate.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1 + months, day));
+  return date.toISOString().slice(0, 10);
+}
+
+export function formatMonthDayYear(isoDate: string): string {
+  const [year, month, day] = isoDate.split("-").map(Number);
+  if (!year || !month || !day) return isoDate;
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(year, month - 1, day)));
+}
+
+export function stayMonthsBetween(start: string, end: string): number {
+  const [startYear, startMonth, startDay] = start.split("-").map(Number);
+  const [endYear, endMonth, endDay] = end.split("-").map(Number);
+  if (!startYear || !startMonth || !startDay || !endYear || !endMonth || !endDay) {
+    return 0;
+  }
+  let months = (endYear - startYear) * 12 + (endMonth - startMonth);
+  if (endDay < startDay) months -= 1;
+  return months;
 }

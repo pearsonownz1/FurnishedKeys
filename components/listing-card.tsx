@@ -7,13 +7,18 @@ import {
   listingFacts,
   minimumStayLabel,
   orderedFees,
-  photoSrc,
   primaryPhoto,
   type PublicListing,
 } from "@/lib/listings";
 import { formatCents } from "@/lib/money";
 
-export function ListingCard({ listing }: { listing: PublicListing }) {
+export function ListingCard({
+  listing,
+  imageUrl,
+}: {
+  listing: PublicListing;
+  imageUrl: string | null;
+}) {
   const photo = primaryPhoto(listing);
   const confirmed = latestConfirmedAt(listing.availability_windows);
 
@@ -21,11 +26,12 @@ export function ListingCard({ listing }: { listing: PublicListing }) {
     <article>
       <Link href={`/rentals/${listing.slug}`} className="group block">
         <div className="relative aspect-[4/3] overflow-hidden rounded-[2px] bg-stone">
-          {photo ? (
+          {imageUrl ? (
             <Image
-              src={photoSrc(photo.storage_path)}
-              alt={photo.caption ?? listing.title}
+              src={imageUrl}
+              alt={photo?.caption ?? listing.title}
               fill
+              unoptimized
               sizes="(min-width: 1024px) 360px, 100vw"
               className="object-cover transition-transform duration-300 group-hover:scale-[1.02]"
             />

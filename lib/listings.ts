@@ -1,318 +1,30 @@
-import { locationById, type Location } from "@/lib/locations";
+import { cache } from "react";
+import type {
+  AvailabilityWindow,
+  FeeKind,
+  ListingFee,
+  ListingManagement,
+  ListingPhoto,
+  ListingPublic,
+  Location,
+  PropertyType,
+} from "@/lib/db/types";
 import { formatCents } from "@/lib/money";
 import type { ListingQuery } from "@/lib/search";
+import { createPublicClient } from "@/lib/supabase/public";
 
 /**
- * Demo fixtures shaped like Backend's tables so a later Supabase select can
- * replace `getPublicListings` without changing the UI.
- *
- * `listings`, `listing_fees`, `listing_photos`, `availability_windows`.
- * Public reads omit `address_private`. Coordinates are rounded and are not
- * an address. Backend types land in `lib/db/types.ts` — do not add that file here.
+ * Catalog reads from the live tables (`listings_public`, `listing_fees`,
+ * `listing_photos`, `availability_windows`, `locations`).
+ * Public reads never include `address_private`.
  */
 
-export type PropertyType = "adu" | "apartment" | "room" | "house" | "other";
-export type Management = "self_managed" | "fk_managed";
-export type ListingStatus =
-  | "draft"
-  | "pending_review"
-  | "approved"
-  | "rejected"
-  | "archived";
-export type ListingFeeStatus = "unpaid" | "paid" | "waived";
-export type FeeKind = "utilities" | "deposit" | "cleaning" | "pet" | "other";
-export type FeeFrequency = "one_time" | "monthly";
-
-export type ListingRow = {
-  id: string;
-  owner_id: string;
-  location_id: string;
-  slug: string;
-  title: string;
-  description: string;
-  property_type: PropertyType;
-  bedrooms: number;
-  bathrooms: number;
-  max_occupants: number;
-  pets_allowed: boolean;
-  pet_policy: string | null;
-  monthly_rent_cents: number;
-  min_stay_months: number;
-  max_stay_months: number | null;
-  amenities: string[];
-  house_rules: string | null;
-  approx_lat: number;
-  approx_lng: number;
-  address_private: string | null;
-  management: Management;
-  status: ListingStatus;
-  is_demo: boolean;
-  listing_fee_status: ListingFeeStatus;
-  reviewed_by: string | null;
-  reviewed_at: string | null;
-  rejection_reason: string | null;
-  created_at: string;
-  updated_at: string;
-};
-
-export type ListingFee = {
-  id: string;
-  listing_id: string;
-  kind: FeeKind;
-  label: string;
-  amount_cents: number;
-  frequency: FeeFrequency;
-  refundable: boolean;
-};
-
-export type ListingPhoto = {
-  id: string;
-  listing_id: string;
-  storage_path: string;
-  caption: string | null;
-  sort: number;
-};
-
-export type AvailabilityWindow = {
-  id: string;
-  listing_id: string;
-  available_from: string;
-  available_to: string | null;
-  last_confirmed_at: string;
-  confirmed_by: string | null;
-};
-
-export type DemoListing = ListingRow & {
-  fees: ListingFee[];
-  photos: ListingPhoto[];
-  availability_windows: AvailabilityWindow[];
-};
-
-export type PublicListing = Omit<ListingRow, "address_private"> & {
+export type PublicListing = ListingPublic & {
   location: Location;
   fees: ListingFee[];
   photos: ListingPhoto[];
   availability_windows: AvailabilityWindow[];
 };
-
-const DEMO_OWNER_ID = "0a11ce00-0000-4000-8000-0000000000aa";
-const BEND_ID = "c3a1e0b2-4d5f-4a6b-8c7d-111111111101";
-
-const demoListings: DemoListing[] = [
-  {
-    id: "d1000001-0000-4000-8000-000000000001",
-    owner_id: DEMO_OWNER_ID,
-    location_id: BEND_ID,
-    slug: "detached-adu-river-trail",
-    title: "Detached ADU near the river trail",
-    description:
-      "A furnished studio ADU near the river trail, with a kitchen, a place to work, and pines outside the windows.",
-    property_type: "adu",
-    bedrooms: 0,
-    bathrooms: 1,
-    max_occupants: 2,
-    pets_allowed: true,
-    pet_policy: "Pets considered",
-    monthly_rent_cents: 185_000,
-    min_stay_months: 3,
-    max_stay_months: null,
-    amenities: ["Furnished", "Washer and dryer", "Workspace", "Kitchen"],
-    house_rules: "No smoking. Quiet hours after 10pm.",
-    approx_lat: 44.04,
-    approx_lng: -121.33,
-    address_private: null,
-    management: "self_managed",
-    status: "approved",
-    is_demo: true,
-    listing_fee_status: "waived",
-    reviewed_by: null,
-    reviewed_at: null,
-    rejection_reason: null,
-    created_at: "2026-10-01T18:00:00.000Z",
-    updated_at: "2026-10-08T18:00:00.000Z",
-    fees: [
-      {
-        id: "f1000001-0000-4000-8000-000000000011",
-        listing_id: "d1000001-0000-4000-8000-000000000001",
-        kind: "utilities",
-        label: "Utilities",
-        amount_cents: 12_000,
-        frequency: "monthly",
-        refundable: false,
-      },
-      {
-        id: "f1000001-0000-4000-8000-000000000012",
-        listing_id: "d1000001-0000-4000-8000-000000000001",
-        kind: "deposit",
-        label: "Deposit",
-        amount_cents: 100_000,
-        frequency: "one_time",
-        refundable: true,
-      },
-    ],
-    photos: [
-      {
-        id: "p1000001-0000-4000-8000-000000000011",
-        listing_id: "d1000001-0000-4000-8000-000000000001",
-        storage_path: "demo/p1.jpg",
-        caption: "Detached ADU on a pine lot",
-        sort: 0,
-      },
-    ],
-    availability_windows: [
-      {
-        id: "a1000001-0000-4000-8000-000000000011",
-        listing_id: "d1000001-0000-4000-8000-000000000001",
-        available_from: "2026-11-01",
-        available_to: null,
-        last_confirmed_at: "2026-10-08T18:00:00.000Z",
-        confirmed_by: null,
-      },
-    ],
-  },
-  {
-    id: "d1000002-0000-4000-8000-000000000002",
-    owner_id: DEMO_OWNER_ID,
-    location_id: BEND_ID,
-    slug: "one-bedroom-pine-views",
-    title: "One-bedroom with pine views",
-    description:
-      "A furnished one-bedroom with a view into the pines. Quiet, light, and set up for a stay of a month or more.",
-    property_type: "apartment",
-    bedrooms: 1,
-    bathrooms: 1,
-    max_occupants: 2,
-    pets_allowed: false,
-    pet_policy: "No pets",
-    monthly_rent_cents: 220_000,
-    min_stay_months: 1,
-    max_stay_months: 6,
-    amenities: ["Furnished", "Pine views", "Parking", "Heating"],
-    house_rules: "No pets. No parties. Park in the marked space.",
-    approx_lat: 44.08,
-    approx_lng: -121.35,
-    address_private: null,
-    management: "self_managed",
-    status: "approved",
-    is_demo: true,
-    listing_fee_status: "waived",
-    reviewed_by: null,
-    reviewed_at: null,
-    rejection_reason: null,
-    created_at: "2026-10-01T18:00:00.000Z",
-    updated_at: "2026-10-09T18:00:00.000Z",
-    fees: [
-      {
-        id: "f1000002-0000-4000-8000-000000000021",
-        listing_id: "d1000002-0000-4000-8000-000000000002",
-        kind: "utilities",
-        label: "Utilities",
-        amount_cents: 0,
-        frequency: "monthly",
-        refundable: false,
-      },
-      {
-        id: "f1000002-0000-4000-8000-000000000022",
-        listing_id: "d1000002-0000-4000-8000-000000000002",
-        kind: "deposit",
-        label: "Deposit",
-        amount_cents: 150_000,
-        frequency: "one_time",
-        refundable: true,
-      },
-    ],
-    photos: [
-      {
-        id: "p1000002-0000-4000-8000-000000000021",
-        listing_id: "d1000002-0000-4000-8000-000000000002",
-        storage_path: "demo/p2.jpg",
-        caption: "Bedroom with pine views",
-        sort: 0,
-      },
-    ],
-    availability_windows: [
-      {
-        id: "a1000002-0000-4000-8000-000000000021",
-        listing_id: "d1000002-0000-4000-8000-000000000002",
-        available_from: "2026-11-01",
-        available_to: "2027-05-01",
-        last_confirmed_at: "2026-10-09T18:00:00.000Z",
-        confirmed_by: null,
-      },
-    ],
-  },
-  {
-    id: "d1000003-0000-4000-8000-000000000003",
-    owner_id: DEMO_OWNER_ID,
-    location_id: BEND_ID,
-    slug: "garden-apartment-downtown",
-    title: "Garden apartment, walk to downtown",
-    description:
-      "A furnished garden apartment within walking distance of downtown. Room for three, with a small patio off the kitchen.",
-    property_type: "apartment",
-    bedrooms: 1,
-    bathrooms: 1,
-    max_occupants: 3,
-    pets_allowed: true,
-    pet_policy: "Dogs OK",
-    monthly_rent_cents: 205_000,
-    min_stay_months: 2,
-    max_stay_months: null,
-    amenities: ["Furnished", "Walk to downtown", "Dishwasher", "Patio"],
-    house_rules: "Dogs are welcome on the patio. No smoking indoors.",
-    approx_lat: 44.06,
-    approx_lng: -121.31,
-    address_private: null,
-    management: "fk_managed",
-    status: "approved",
-    is_demo: true,
-    listing_fee_status: "waived",
-    reviewed_by: null,
-    reviewed_at: null,
-    rejection_reason: null,
-    created_at: "2026-10-01T18:00:00.000Z",
-    updated_at: "2026-10-10T18:00:00.000Z",
-    fees: [
-      {
-        id: "f1000003-0000-4000-8000-000000000031",
-        listing_id: "d1000003-0000-4000-8000-000000000003",
-        kind: "utilities",
-        label: "Utilities",
-        amount_cents: 9_000,
-        frequency: "monthly",
-        refundable: false,
-      },
-      {
-        id: "f1000003-0000-4000-8000-000000000032",
-        listing_id: "d1000003-0000-4000-8000-000000000003",
-        kind: "pet",
-        label: "Pet fee",
-        amount_cents: 4_000,
-        frequency: "monthly",
-        refundable: false,
-      },
-    ],
-    photos: [
-      {
-        id: "p1000003-0000-4000-8000-000000000031",
-        listing_id: "d1000003-0000-4000-8000-000000000003",
-        storage_path: "demo/p3.jpg",
-        caption: "Garden apartment kitchen",
-        sort: 0,
-      },
-    ],
-    availability_windows: [
-      {
-        id: "a1000003-0000-4000-8000-000000000031",
-        listing_id: "d1000003-0000-4000-8000-000000000003",
-        available_from: "2026-10-15",
-        available_to: null,
-        last_confirmed_at: "2026-10-10T18:00:00.000Z",
-        confirmed_by: null,
-      },
-    ],
-  },
-];
 
 const FEE_ORDER: FeeKind[] = [
   "utilities",
@@ -322,50 +34,98 @@ const FEE_ORDER: FeeKind[] = [
   "other",
 ];
 
-export function photoSrc(storagePath: string): string {
-  if (storagePath.startsWith("demo/")) return `/${storagePath}`;
-  return storagePath;
+function asNumber(value: number | string | null | undefined): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const number = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(number) ? number : null;
 }
 
-export function toPublicListing(row: DemoListing): PublicListing {
-  const location = locationById(row.location_id);
-  if (!location) {
-    throw new Error(`Unknown location_id ${row.location_id}`);
-  }
-
-  const {
-    address_private: privateAddress,
-    fees,
-    photos,
-    availability_windows,
-    ...listing
-  } = row;
-
-  // Public reads never include an exact address.
-  void privateAddress;
-
+function normalizeListing(row: ListingPublic): ListingPublic {
   return {
-    ...listing,
-    location,
-    fees,
-    photos,
-    availability_windows,
+    ...row,
+    bedrooms: asNumber(row.bedrooms) ?? 0,
+    bathrooms: asNumber(row.bathrooms) ?? 0,
+    max_occupants: asNumber(row.max_occupants) ?? 1,
+    monthly_rent_cents: asNumber(row.monthly_rent_cents) ?? 0,
+    min_stay_months: asNumber(row.min_stay_months) ?? 1,
+    max_stay_months:
+      row.max_stay_months === null ? null : asNumber(row.max_stay_months),
+    approx_lat: asNumber(row.approx_lat),
+    approx_lng: asNumber(row.approx_lng),
+    amenities: row.amenities ?? [],
   };
 }
 
-export function getDemoListings(): DemoListing[] {
-  return demoListings;
+function normalizeFee(fee: ListingFee): ListingFee {
+  return { ...fee, amount_cents: asNumber(fee.amount_cents) ?? 0 };
 }
 
-export function getPublicListings(): PublicListing[] {
-  return demoListings
-    .filter((listing) => listing.status === "approved")
-    .map(toPublicListing);
+function groupByListing<T extends { listing_id: string }>(rows: T[]): Map<string, T[]> {
+  const grouped = new Map<string, T[]>();
+  for (const row of rows) {
+    const list = grouped.get(row.listing_id) ?? [];
+    list.push(row);
+    grouped.set(row.listing_id, list);
+  }
+  return grouped;
 }
 
-export function getListingBySlug(slug: string): PublicListing | undefined {
-  return getPublicListings().find((listing) => listing.slug === slug);
+async function loadPublicListings(): Promise<PublicListing[]> {
+  const supabase = createPublicClient();
+  const { data: rows, error } = await supabase
+    .from("listings_public")
+    .select("*")
+    .eq("status", "approved");
+
+  if (error) {
+    throw new Error("Could not load listings");
+  }
+
+  const listings = (rows ?? []).map((row) => normalizeListing(row));
+  if (listings.length === 0) return [];
+
+  const ids = listings.map((listing) => listing.id);
+  const locationIds = [...new Set(listings.map((listing) => listing.location_id))];
+
+  const [feesResult, photosResult, windowsResult, locationsResult] = await Promise.all([
+    supabase.from("listing_fees").select("*").in("listing_id", ids),
+    supabase.from("listing_photos").select("*").in("listing_id", ids),
+    supabase.from("availability_windows").select("*").in("listing_id", ids),
+    supabase.from("locations").select("*").in("id", locationIds),
+  ]);
+
+  if (feesResult.error || photosResult.error || windowsResult.error || locationsResult.error) {
+    throw new Error("Could not load listing details");
+  }
+
+  const fees = groupByListing((feesResult.data ?? []).map(normalizeFee));
+  const photos = groupByListing(photosResult.data ?? []);
+  const windows = groupByListing(windowsResult.data ?? []);
+  const locations = new Map(
+    (locationsResult.data ?? []).map((location) => [location.id, location]),
+  );
+
+  return listings.flatMap((listing) => {
+    const location = locations.get(listing.location_id);
+    if (!location) return [];
+    return [
+      {
+        ...listing,
+        location,
+        fees: fees.get(listing.id) ?? [],
+        photos: photos.get(listing.id) ?? [],
+        availability_windows: windows.get(listing.id) ?? [],
+      },
+    ];
+  });
 }
+
+export const getPublicListings = cache(loadPublicListings);
+
+export const getListingBySlug = cache(async (slug: string) => {
+  const listings = await getPublicListings();
+  return listings.find((listing) => listing.slug === slug) ?? null;
+});
 
 export function filterListings(
   listings: PublicListing[],
@@ -404,14 +164,60 @@ export function filterListings(
       if (!open) return false;
     }
 
+    if (query.type && listing.property_type !== query.type) return false;
+    if (query.studioOnly && listing.bedrooms !== 0) return false;
+    if (
+      query.bedroomsMin !== undefined &&
+      listing.bedrooms < query.bedroomsMin
+    ) {
+      return false;
+    }
+    if (query.pets && !listing.pets_allowed) return false;
+    if (
+      query.minStay !== undefined &&
+      listing.min_stay_months > query.minStay
+    ) {
+      return false;
+    }
+
     return true;
   });
+}
+
+export function sortByRecentConfirmation(
+  listings: PublicListing[],
+): PublicListing[] {
+  return [...listings].sort((a, b) => {
+    const left = latestConfirmedAt(a.availability_windows) ?? "";
+    const right = latestConfirmedAt(b.availability_windows) ?? "";
+    if (left !== right) return left < right ? 1 : -1;
+    return a.slug < b.slug ? -1 : a.slug > b.slug ? 1 : 0;
+  });
+}
+
+export function monthlyTotalCents(
+  listing: Pick<PublicListing, "monthly_rent_cents" | "fees">,
+): number {
+  const monthlyFees = listing.fees
+    .filter((fee) => fee.frequency === "monthly")
+    .reduce((sum, fee) => sum + fee.amount_cents, 0);
+  return listing.monthly_rent_cents + monthlyFees;
 }
 
 export function orderedFees(fees: ListingFee[]): ListingFee[] {
   return [...fees].sort(
     (a, b) => FEE_ORDER.indexOf(a.kind) - FEE_ORDER.indexOf(b.kind),
   );
+}
+
+/** Monthly charges, then one-time fees, with the deposit last. */
+export function costTableFees(fees: ListingFee[]): ListingFee[] {
+  const monthly = fees.filter((fee) => fee.frequency === "monthly");
+  const oneTime = fees.filter(
+    (fee) => fee.frequency === "one_time" && fee.kind !== "deposit",
+  );
+  const deposits = fees.filter((fee) => fee.kind === "deposit");
+  return [...orderedFees(monthly), ...orderedFees(oneTime), ...orderedFees(deposits)];
 }
 
 export function formatFee(fee: ListingFee): string {
@@ -425,46 +231,118 @@ export function formatFee(fee: ListingFee): string {
   return `${fee.label} ${amount}`;
 }
 
+export function formatBrowseFee(fee: ListingFee): string {
+  if (fee.kind === "utilities" && fee.amount_cents === 0) {
+    return "Utilities included";
+  }
+  const amount = formatCents(fee.amount_cents);
+  if (fee.frequency === "monthly") return `${fee.label} ${amount}/mo`;
+  return `${fee.label} ${amount}`;
+}
+
+export function feeAmountLabel(fee: ListingFee): string {
+  if (fee.kind === "utilities" && fee.amount_cents === 0) return "Included";
+  const amount = formatCents(fee.amount_cents);
+  return fee.frequency === "monthly" ? `${amount} / month` : `${amount} one time`;
+}
+
+export function propertyTypeLabel(type: PropertyType): string {
+  switch (type) {
+    case "adu":
+      return "ADU";
+    case "apartment":
+      return "Apartment";
+    case "room":
+      return "Room";
+    case "house":
+      return "House";
+    case "other":
+      return "Other";
+  }
+}
+
+export function managementLabel(management: ListingManagement): string {
+  return management === "fk_managed" ? "Furnished Keys managed" : "Self-managed";
+}
+
+export function bedLabel(bedrooms: number): string {
+  if (bedrooms === 0) return "Studio";
+  return bedrooms === 1 ? "1 bed" : `${bedrooms} bed`;
+}
+
+export function bathLabel(bathrooms: number): string {
+  const value = Number(bathrooms);
+  const text = Number.isInteger(value) ? String(value) : String(value);
+  return value === 1 ? "1 bath" : `${text} bath`;
+}
+
+export function minStayTag(months: number): string {
+  return months === 1 ? "1-month min" : `${months}-month min`;
+}
+
 export function minimumStayLabel(months: number): string {
   return months === 1 ? "1-month minimum" : `${months}-month minimum`;
 }
 
+export function sortedPhotos(listing: PublicListing): ListingPhoto[] {
+  return [...listing.photos].sort((a, b) => a.sort - b.sort);
+}
+
 export function listingFacts(
   listing: Pick<
-    ListingRow,
+    PublicListing,
     "bedrooms" | "max_occupants" | "pet_policy" | "pets_allowed"
   >,
 ): string {
-  const beds =
-    listing.bedrooms === 0
-      ? "Studio"
-      : listing.bedrooms === 1
-        ? "1 bed"
-        : `${listing.bedrooms} bed`;
   const pets =
     listing.pet_policy?.trim() ||
     (listing.pets_allowed ? "Pets allowed" : "No pets");
-  return `${beds} · Sleeps ${listing.max_occupants} · ${pets}`;
+  return `${bedLabel(listing.bedrooms)} · Sleeps ${listing.max_occupants} · ${pets}`;
 }
 
-export function latestConfirmedAt(
+export function browseMeta(listing: PublicListing): string {
+  return `${propertyTypeLabel(listing.property_type)} · ${bedLabel(listing.bedrooms)} · Sleeps ${listing.max_occupants}`;
+}
+
+export function petTag(listing: Pick<PublicListing, "pet_policy" | "pets_allowed">): string {
+  return (
+    listing.pet_policy?.trim() ||
+    (listing.pets_allowed ? "Pets allowed" : "No pets")
+  );
+}
+
+export function latestConfirmedAt(windows: AvailabilityWindow[]): string | null {
+  const stamps = windows
+    .map((window) => window.last_confirmed_at)
+    .filter((stamp): stamp is string => Boolean(stamp));
+  if (stamps.length === 0) return null;
+  return [...stamps].sort((a, b) => (a < b ? 1 : -1))[0] ?? null;
+}
+
+export function primaryWindow(
   windows: AvailabilityWindow[],
-): string | null {
-  if (windows.length === 0) return null;
-  return [...windows].sort((a, b) =>
-    a.last_confirmed_at < b.last_confirmed_at ? 1 : -1,
-  )[0].last_confirmed_at;
+): AvailabilityWindow | undefined {
+  if (windows.length === 0) return undefined;
+  return [...windows].sort((a, b) => {
+    const left = a.last_confirmed_at ?? "";
+    const right = b.last_confirmed_at ?? "";
+    if (left === right) return a.available_from < b.available_from ? -1 : 1;
+    return left < right ? 1 : -1;
+  })[0];
 }
 
-export function confirmationLabel(iso: string): string {
-  const formatted = new Intl.DateTimeFormat("en-US", {
+export function confirmedDay(iso: string): string {
+  return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
     timeZone: "America/Los_Angeles",
   }).format(new Date(iso));
-  return `Availability confirmed ${formatted}`;
+}
+
+export function confirmationLabel(iso: string): string {
+  return `Availability confirmed ${confirmedDay(iso)}`;
 }
 
 export function primaryPhoto(listing: PublicListing): ListingPhoto | undefined {
-  return [...listing.photos].sort((a, b) => a.sort - b.sort)[0];
+  return sortedPhotos(listing)[0];
 }
