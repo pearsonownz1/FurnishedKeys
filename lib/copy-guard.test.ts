@@ -20,6 +20,15 @@ describe("copy guard", () => {
     expect(hits).toEqual([]);
   });
 
+  it("does not mention a refund", () => {
+    const files = [...walk("app"), ...walk("components")];
+    const hits = files.flatMap((file) => {
+      const source = readFileSync(file, "utf8");
+      return /refund/i.test(source) ? [file] : [];
+    });
+    expect(hits).toEqual([]);
+  });
+
   it("does not show a management price", () => {
     const pages = walk("app").filter((file) => file.includes("management"));
     expect(pages.length).toBeGreaterThan(0);

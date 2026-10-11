@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { brand } from "@/lib/brand";
@@ -12,6 +13,13 @@ export function SiteFooter() {
       <p>
         {brand.name} · {locationPlace(market)}
       </p>
+      <nav aria-label="Footer" className="flex flex-wrap gap-x-2">
+        <Link href="/rentals">Renters</Link>
+        <span aria-hidden="true">·</span>
+        <Link href="/owners">Owners</Link>
+        <span aria-hidden="true">·</span>
+        <Link href="/management">Management</Link>
+      </nav>
       <Suspense fallback={null}>
         <DemoNote />
       </Suspense>

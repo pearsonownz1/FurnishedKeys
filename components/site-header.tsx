@@ -1,13 +1,17 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 const links = [
   { href: "/rentals", label: "Find a home" },
-  { href: "/list", label: "List your property" },
+  { href: "/owners", label: "List your property" },
   { href: "/management", label: "Management" },
   { href: "/sign-in", label: "Sign in" },
 ] as const;
 
 export function SiteHeader({ tone = "solid" }: { tone?: "overlay" | "solid" }) {
+  const pathname = usePathname();
   const overlay = tone === "overlay";
   const listClass = overlay
     ? "rounded-[2px] border border-white/70 px-3.5 py-2 text-sm"
@@ -42,11 +46,19 @@ export function SiteHeader({ tone = "solid" }: { tone?: "overlay" | "solid" }) {
           aria-label="Primary"
           className={`hidden items-center gap-7 text-sm lg:flex ${overlay ? "" : "text-muted"}`}
         >
-          {links.map((link) => (
-            <Link key={link.href} href={link.href} className="hover:opacity-80">
-              {link.label}
-            </Link>
-          ))}
+          {links.map((link) => {
+            const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                aria-current={active ? "page" : undefined}
+                className={active ? "font-semibold hover:opacity-80" : "hover:opacity-80"}
+              >
+                {link.label}
+              </Link>
+            );
+          })}
           <Link href="/list" className={listClass}>
             List a property
           </Link>
@@ -63,15 +75,23 @@ export function SiteHeader({ tone = "solid" }: { tone?: "overlay" | "solid" }) {
               aria-label="Mobile"
               className="absolute right-0 z-30 mt-2 w-56 border border-line bg-surface p-2 text-ink"
             >
-              {links.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className="block px-3 py-2.5 text-sm hover:bg-stone"
-                >
-                  {link.label}
-                </Link>
-              ))}
+              {links.map((link) => {
+                const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    aria-current={active ? "page" : undefined}
+                    className={
+                      active
+                        ? "block px-3 py-2.5 text-sm font-semibold hover:bg-stone"
+                        : "block px-3 py-2.5 text-sm hover:bg-stone"
+                    }
+                  >
+                    {link.label}
+                  </Link>
+                );
+              })}
             </nav>
           </details>
         </div>

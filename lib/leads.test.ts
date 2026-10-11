@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { toOwnerLeadInsert, validateOwnerLead, type OwnerLeadInput } from "./leads";
+import { listMyPropertyLabel, listingFeeCadenceLabel } from "./pricing";
 
 const base: OwnerLeadInput = {
   name: "QA test – delete",
@@ -32,6 +33,19 @@ describe("validateOwnerLead", () => {
     expect(row.source).toBe("letter");
   });
 
+  it("requires an address and a property type", () => {
+    const missing = validateOwnerLead({
+      ...base,
+      propertyAddress: "",
+      propertyType: "",
+    });
+    expect(missing.ok).toBe(false);
+    if (!missing.ok) {
+      expect(missing.fieldErrors.propertyAddress).toBe("Add the property address.");
+      expect(missing.fieldErrors.propertyType).toBe("Choose a property type.");
+    }
+  });
+
   it("omits a skipped interest and an invalid source", () => {
     const row = toOwnerLeadInsert({ ...base, interest: "", source: "Not a slug!" });
     expect(row.interest).toBeNull();
@@ -41,7 +55,7 @@ describe("validateOwnerLead", () => {
 });
 
 describe("owner lead insert", () => {
-  it("inserts anonymously and does not read the row back", () => {
+  it("keeps a row mapper ready and does not persist yet", () => {
     expect(toOwnerLeadInsert(base)).toMatchObject({
       name: base.name,
       email: base.email,
@@ -54,8 +68,16 @@ describe("owner lead insert", () => {
       new URL("../app/(site)/owners/actions.ts", import.meta.url),
       "utf8",
     );
-    expect(action).toContain(".insert(");
+    expect(action).toContain('.from("owner_leads").insert(');
+    expect(action).toContain("logInsertError");
     expect(action).not.toMatch(/\.insert\([\s\S]*?\)\s*\.select\(/);
     expect(action).not.toMatch(/\.single\(/);
+    expect(listMyPropertyLabel()).toBe("List my property — $199/year");
+    expect(listingFeeCadenceLabel()).toBe("/year per listing");
+  });
+
+  it("accepts a written availability note", () => {
+    const result = validateOwnerLead({ ...base, availableFrom: "December 1" });
+    expect(result.ok).toBe(true);
   });
 });

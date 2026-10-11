@@ -1,5 +1,6 @@
 import type Stripe from "stripe";
 import { jsonError } from "@/lib/api/http";
+import { SELF_LIST_PRICE_CENTS } from "@/lib/pricing";
 import {
   planListingFeeEvent,
   type FeeSnapshot,
@@ -92,7 +93,7 @@ async function applyCheckout(
     sessionId: session.id,
     subscriptionId,
     periodEnd,
-    amountCents: session.amount_total ?? 19900,
+    amountCents: session.amount_total ?? SELF_LIST_PRICE_CENTS,
     autoRenew,
     paidAt: new Date().toISOString(),
   };

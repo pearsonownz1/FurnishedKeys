@@ -70,7 +70,8 @@ describe("toInquiryInsert", () => {
       new URL("../app/(site)/rentals/actions.ts", import.meta.url),
       "utf8",
     );
-    expect(action).toContain(".insert(");
+    expect(action).toContain('.from("inquiries").insert(');
+    expect(action).toContain("logInsertError");
     expect(action).not.toMatch(/\.insert\([\s\S]*?\)\s*\.select\(/);
     expect(action).not.toMatch(/\.single\(/);
   });

@@ -16,10 +16,16 @@ export async function signListingPhotoPaths(
   const urls = new Map<string, string>();
   if (unique.length === 0) return urls;
 
+  const remote = unique.filter((path) => !path.startsWith("demo/"));
+  for (const path of unique) {
+    if (path.startsWith("demo/")) urls.set(path, `/${path}`);
+  }
+  if (remote.length === 0) return urls;
+
   const supabase = createPublicClient();
   const { data, error } = await supabase.storage
     .from(LISTING_PHOTOS_BUCKET)
-    .createSignedUrls(unique, LISTING_PHOTO_TTL_SECONDS);
+    .createSignedUrls(remote, LISTING_PHOTO_TTL_SECONDS);
 
   if (error || !data) return urls;
 
