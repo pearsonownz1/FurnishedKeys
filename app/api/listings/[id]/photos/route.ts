@@ -1,5 +1,5 @@
 import { accessDenied, invalidBody, jsonError, readJson } from "@/lib/api/http";
-import { loadOwnerListing, sessionUser } from "@/lib/api/owner-listing";
+import { openOwnerListing } from "@/lib/api/read-owner-listing";
 import { requireEditableListing } from "@/lib/listings/access";
 import { listingPhotoPath, photoUploadSchema } from "@/lib/listings/schemas";
 import { MAX_LISTING_PHOTOS, photosExceedLimit } from "@/lib/listings/setup";
@@ -9,10 +9,10 @@ type Context = { params: Promise<{ id: string }> };
 
 export async function POST(request: Request, context: Context) {
   const { id } = await context.params;
-  const { supabase, user } = await sessionUser();
-  const listing = await loadOwnerListing(supabase, id);
-  if (!listing) return jsonError(404, "Listing not found");
-  const allowed = requireEditableListing(user?.id ?? null, listing);
+  const opened = await openOwnerListing(id);
+  if (!opened.ok) return opened.response;
+  const { supabase, user, listing } = opened;
+  const allowed = requireEditableListing(user.id, listing);
   if (!allowed.ok) return accessDenied(allowed);
 
   let body: unknown;

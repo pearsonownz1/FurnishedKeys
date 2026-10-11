@@ -131,6 +131,26 @@ describe("placeholder waiver", () => {
 });
 
 describe("POST /api/listings/[id]/checkout", () => {
+  it("returns 401 before reading the listing when there is no session", async () => {
+    vi.mocked(sessionUser).mockResolvedValue({
+      supabase: {} as Awaited<ReturnType<typeof sessionUser>>["supabase"],
+      user: null,
+    });
+
+    const response = await POST(checkoutRequest(), context);
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: "Sign in required" });
+    expect(loadOwnerListing).not.toHaveBeenCalled();
+  });
+
+  it("returns JSON 500 when the listing query fails", async () => {
+    vi.mocked(loadOwnerListing).mockRejectedValue(new Error("permission denied for table listings"));
+
+    const response = await POST(checkoutRequest(), context);
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ error: "permission denied for table listings" });
+  });
+
   it("waives for one year when Stripe is not configured", async () => {
     vi.mocked(paymentsConfigured).mockReturnValue(false);
     const rpc = vi.fn().mockResolvedValue({ data: true, error: null });
