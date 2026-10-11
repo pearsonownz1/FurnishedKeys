@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { activeLocations, locationBySlug } from "./locations";
 import type { PublicListing } from "./listings";
 import {
   catalogAllowsFixtures,
@@ -57,6 +58,10 @@ function listing(partial: Partial<PublicListing> & Pick<PublicListing, "slug">):
       country: "US",
       active: true,
       sort: 1,
+      sort_order: 1,
+      parent_id: "c3a1e0b2-4d5f-4a6b-8c7d-111111111102",
+      lat: 44.058172,
+      lng: -121.315308,
     },
     fees: partial.fees ?? [],
     photos: partial.photos ?? [],
@@ -181,7 +186,11 @@ describe("listing catalog", () => {
         state: "OR",
         country: "US",
         active: true,
-        sort: 2,
+        sort: 10,
+        sort_order: 10,
+        parent_id: null,
+        lat: 43.915,
+        lng: -121.3,
       },
       availability_windows: [
         {
@@ -216,5 +225,59 @@ describe("listing catalog", () => {
     ]);
     expect(filterListings(listings, { moveIn: "2026-10-01" })).toHaveLength(0);
     expect(sortByRecentConfirmation(listings)[0]?.slug).toBe("county-home");
+  });
+
+  it("includes Deschutes cities in the county and keeps a city search to that city", () => {
+    const directory = activeLocations();
+    const slugs = [
+      "bend",
+      "redmond",
+      "sisters",
+      "sunriver",
+      "la-pine",
+      "tumalo",
+      "terrebonne",
+      "deschutes-county",
+      "prineville",
+      "madras",
+    ] as const;
+    const parentOnly = listing({
+      slug: "parent-only-home",
+      location: {
+        ...locationBySlug("redmond")!,
+        region: "High Desert",
+      },
+    });
+    const listings = [
+      ...slugs.map((slug) => {
+        const location = locationBySlug(slug);
+        if (!location) throw new Error(slug);
+        return listing({ slug: `${slug}-home`, location });
+      }),
+      parentOnly,
+    ];
+
+    expect(
+      filterListings(listings, { where: "deschutes-county" }, directory).map((item) => item.slug),
+    ).toEqual([
+      "bend-home",
+      "redmond-home",
+      "sisters-home",
+      "sunriver-home",
+      "la-pine-home",
+      "tumalo-home",
+      "terrebonne-home",
+      "deschutes-county-home",
+      "parent-only-home",
+    ]);
+    expect(filterListings(listings, { where: "bend" }, directory).map((item) => item.slug)).toEqual([
+      "bend-home",
+    ]);
+    expect(
+      filterListings(listings, { where: "prineville" }, directory).map((item) => item.slug),
+    ).toEqual(["prineville-home"]);
+    expect(filterListings(listings, { where: "madras" }, directory).map((item) => item.slug)).toEqual([
+      "madras-home",
+    ]);
   });
 });

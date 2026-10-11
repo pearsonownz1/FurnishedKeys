@@ -1,15 +1,23 @@
 # FurnishedKeys data model
 
-Postgres schema for the Supabase project. Migrations, in order: `supabase/migrations/20261011033000_init.sql`, `supabase/migrations/20261011041000_owner_lead_interest.sql`, `supabase/migrations/20261011053000_listing_subscription.sql`. Demo inventory is `supabase/seed.sql` (local `supabase db reset` only). Hand-written TypeScript for the front end is `lib/db/types.ts`.
+Postgres schema for the Supabase project. Migrations, in order: `supabase/migrations/20261011033000_init.sql`, `supabase/migrations/20261011041000_owner_lead_interest.sql`, `supabase/migrations/20261011053000_listing_subscription.sql`, `supabase/migrations/20261011220434_central_oregon_locations.sql`. Demo inventory is `supabase/seed.sql` (local `supabase db reset` only). Hand-written TypeScript for the front end is `lib/db/types.ts`.
 
-Markets are rows in `locations`. Policies and functions do not name a city. The launch rows match the front-end mirror in `lib/locations.ts`:
+Markets are rows in `locations`. Policies and functions do not name a city. The rows match the front-end mirror in `lib/locations.ts`. `sort_order` is the Where dropdown order. `parent_id` points at the county row. `lat` and `lng` are the map center.
 
-| id | slug | name | region | state | country | active | sort |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| `c3a1e0b2-4d5f-4a6b-8c7d-111111111101` | `bend` | Bend | Deschutes County | OR | US | true | 1 |
-| `c3a1e0b2-4d5f-4a6b-8c7d-111111111102` | `deschutes-county` | Deschutes County | Central Oregon | OR | US | true | 2 |
+| sort_order | slug | name | region | parent |
+| --- | --- | --- | --- | --- |
+| 1 | `bend` | Bend | Deschutes County | Deschutes County |
+| 2 | `redmond` | Redmond | Deschutes County | Deschutes County |
+| 3 | `prineville` | Prineville | Crook County | — |
+| 4 | `madras` | Madras | Jefferson County | — |
+| 5 | `la-pine` | La Pine | Deschutes County | Deschutes County |
+| 6 | `sisters` | Sisters | Deschutes County | Deschutes County |
+| 7 | `sunriver` | Sunriver | Deschutes County | Deschutes County |
+| 8 | `terrebonne` | Terrebonne | Deschutes County | Deschutes County |
+| 9 | `tumalo` | Tumalo | Deschutes County | Deschutes County |
+| 10 | `deschutes-county` | Deschutes County | Central Oregon | — |
 
-Bend’s `region` is the county name so launch copy can be built from the row (`Now in Bend & Deschutes County`). Adding a market is an insert into `locations`, not a code change.
+Bend’s `region` is the county name so launch copy can be built from the row (`Now in Bend & Deschutes County`). The Where dropdown is `loadWhereLocations()` in `lib/locations-load.ts`. It returns `WhereLocation[]` sorted by `sort_order`: `{ id, slug, name, region, state, country, sort_order, parent_id, lat, lng }`. The listing wizard uses `loadCityLocations()`, the same shape without a row that is another row’s parent. Searching a county slug includes that row, rows whose `parent_id` is that county, and rows whose `region` slugifies to that slug. Searching a city slug includes only that city. Adding a market is an insert into `locations`, not a hard-coded city in a component.
 
 ## Tables
 
@@ -17,7 +25,9 @@ Surrogate keys are `uuid`, default `gen_random_uuid()`, except `profiles.id`, wh
 
 ### `locations`
 
-`id`, `slug`, `name`, `region`, `state`, `country`, `active`, `sort`.
+`id`, `slug`, `name`, `region`, `state`, `country`, `active`, `sort`, `sort_order`, `parent_id`, `lat`, `lng`.
+
+`sort_order` is an integer, default 0. `parent_id` is a nullable foreign key to `locations`. `lat` and `lng` are `numeric(9,6)` and are stored as a pair or not at all. `20261011220434_central_oregon_locations.sql` adds those columns and the Central Oregon cities.
 
 Public read of active rows. Admins read and write every row, including inactive markets staged for later.
 

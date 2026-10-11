@@ -18,12 +18,14 @@ export function BrowseBoard({
   summary,
   view,
   catalogError,
+  placeCenter = null,
 }: {
   items: BrowseItem[];
   title: string;
   summary: string;
   view: BrowseView;
   catalogError: boolean;
+  placeCenter?: { lat: number; lng: number } | null;
 }) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const activeId =
@@ -43,7 +45,7 @@ export function BrowseBoard({
         ]
       : [],
   );
-  const center = approximateCenter(points);
+  const center = approximateCenter(points) ?? placeCenter;
 
   return (
     <div className="lg:grid lg:h-full lg:grid-cols-[minmax(0,1fr)_minmax(320px,46%)] lg:overflow-hidden">

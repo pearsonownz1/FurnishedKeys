@@ -8,11 +8,13 @@ import { SiteFooter } from "@/components/site-footer";
 import { AccountHeader } from "@/components/account-header";
 import { brand } from "@/lib/brand";
 import {
+  filterListings,
   getPublicListings,
   primaryPhoto,
   sortByRecentConfirmation,
 } from "@/lib/listings";
 import { launchKicker, primaryLocation } from "@/lib/locations";
+import { loadWhereLocations } from "@/lib/locations-load";
 import { signedPhotoUrls } from "@/lib/photos";
 import { FREE_TO_LIST } from "@/lib/pricing";
 
@@ -219,7 +221,11 @@ export function HomePage() {
 
 async function AvailableHomes() {
   await connection();
-  const listings = sortByRecentConfirmation(await getPublicListings()).slice(0, 3);
+  const market = primaryLocation();
+  const directory = await loadWhereLocations();
+  const listings = sortByRecentConfirmation(
+    filterListings(await getPublicListings(), { where: market.slug }, directory),
+  ).slice(0, 3);
   const photos = await signedPhotoUrls(listings);
 
   return (

@@ -1,6 +1,7 @@
 import { connection } from "next/server";
 import type { ReactNode } from "react";
-import { activeLocations, locationShort, primaryLocation } from "@/lib/locations";
+import { locationShort, primaryLocation } from "@/lib/locations";
+import { loadWhereLocations } from "@/lib/locations-load";
 import {
   budgetOptions,
   DEFAULT_BUDGET_CENTS,
@@ -14,6 +15,7 @@ export async function SearchBar() {
   await connection();
   const now = new Date();
   const market = primaryLocation();
+  const places = await loadWhereLocations();
   const moveIns = moveInOptions(now);
 
   return (
@@ -30,7 +32,7 @@ export async function SearchBar() {
           defaultValue={market.slug}
           className="field-input"
         >
-          {activeLocations().map((location) => (
+          {places.map((location) => (
             <option key={location.id} value={location.slug}>
               {locationShort(location)}
             </option>

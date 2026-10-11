@@ -2,7 +2,8 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { SignupForm } from "@/components/auth/signup-form";
 import { sanitizeSource } from "@/lib/leads";
-import { activeLocations, locationShort } from "@/lib/locations";
+import { locationShort } from "@/lib/locations";
+import { loadCityLocations } from "@/lib/locations-load";
 import { canonical } from "@/lib/site";
 
 export const metadata = {
@@ -26,7 +27,7 @@ async function Signup({ searchParams }: { searchParams: Promise<Search> }) {
   const params = await searchParams;
   const raw = params.src;
   const source = sanitizeSource(Array.isArray(raw) ? raw[0] : raw);
-  const places = activeLocations().map((location) => ({
+  const places = (await loadCityLocations()).map((location) => ({
     id: location.id,
     label: locationShort(location),
   }));
