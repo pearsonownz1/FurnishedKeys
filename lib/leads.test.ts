@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { toOwnerLeadInsert, validateOwnerLead, type OwnerLeadInput } from "./leads";
+import { listMyPropertyLabel } from "./pricing";
 
 const base: OwnerLeadInput = {
   name: "QA test – delete",
@@ -54,7 +55,7 @@ describe("validateOwnerLead", () => {
 });
 
 describe("owner lead insert", () => {
-  it("inserts anonymously and does not read the row back", () => {
+  it("keeps a row mapper ready and does not persist yet", () => {
     expect(toOwnerLeadInsert(base)).toMatchObject({
       name: base.name,
       email: base.email,
@@ -67,8 +68,14 @@ describe("owner lead insert", () => {
       new URL("../app/(site)/owners/actions.ts", import.meta.url),
       "utf8",
     );
-    expect(action).toContain(".insert(");
-    expect(action).not.toMatch(/\.insert\([\s\S]*?\)\s*\.select\(/);
-    expect(action).not.toMatch(/\.single\(/);
+    expect(action).toContain("owner_leads");
+    expect(action).not.toContain(".insert(");
+    expect(action).not.toContain("createClient");
+    expect(listMyPropertyLabel()).toBe("List my property — $199");
+  });
+
+  it("accepts a written availability note", () => {
+    const result = validateOwnerLead({ ...base, availableFrom: "December 1" });
+    expect(result.ok).toBe(true);
   });
 });

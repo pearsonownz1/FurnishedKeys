@@ -63,10 +63,10 @@ async function OwnersLanding({ searchParams }: { searchParams: Promise<Search> }
 
   return (
     <div>
-      <section className="grid bg-stone lg:min-h-[620px] lg:grid-cols-2">
-        <div className="flex flex-col justify-center px-5 py-14 sm:px-10 lg:py-20 lg:pr-16 lg:pl-[max(2rem,calc((100vw-1200px)/2))]">
+      <section className="grid bg-stone md:min-h-[620px] md:grid-cols-2">
+        <div className="flex flex-col justify-center px-5 py-14 md:px-10 md:py-16 lg:pt-[110px] lg:pr-20 lg:pb-20 lg:pl-[120px]">
           <p className="text-xs tracking-[0.14em] text-muted uppercase">{ownersKicker()}</p>
-          <h1 className="mt-4 max-w-[14ch] font-serif text-[clamp(2.75rem,6vw,5.25rem)] leading-[0.95] font-normal tracking-[-1px]">
+          <h1 className="mt-4 max-w-[12ch] font-serif text-[clamp(2.75rem,8vw,5.25rem)] leading-[0.95] font-normal tracking-[-1px] md:text-[84px]">
             Your furnished space,{" "}
             <span className="text-pine italic">rented by the month.</span>
           </h1>
@@ -109,21 +109,19 @@ async function OwnersLanding({ searchParams }: { searchParams: Promise<Search> }
         <h2 className="font-serif text-[clamp(2.25rem,4vw,3.25rem)] leading-[1.05] font-normal tracking-[-0.6px]">
           Two ways to work with us
         </h2>
-        <div className="mt-8 grid gap-px bg-line lg:grid-cols-2">
-          <article className="bg-surface px-6 py-10 sm:px-11">
+        <div className="mt-8 grid gap-px bg-line md:grid-cols-2">
+          <article className="bg-surface p-8 md:p-11">
             <p className="text-xs tracking-[0.14em] text-muted uppercase">List it yourself</p>
             <h3 className="mt-3 font-serif text-[clamp(1.75rem,3vw,2.25rem)] leading-none font-normal">
               Your listing, your renters
             </h3>
             <p className="mt-6 font-serif text-[56px] leading-none text-pine">{listingFeeAmount()}</p>
-            <p className="mt-1 text-sm text-muted">per listing, per year</p>
+            <p className="mt-1 text-sm text-muted">per listing</p>
             <ul className="mt-8">
               {selfPoints.map((point) => (
-                <li key={point} className="border-t border-line py-3 text-[15px] leading-relaxed">
-                  <span className="text-pine" aria-hidden="true">
-                    —{" "}
-                  </span>
-                  {point}
+                <li key={point} className="flex items-start gap-3 border-t border-line py-3 text-[15px] leading-relaxed">
+                  <span aria-hidden="true" className="mt-[0.7em] h-px w-2.5 shrink-0 bg-pine" />
+                  <span>{point}</span>
                 </li>
               ))}
             </ul>
@@ -134,7 +132,7 @@ async function OwnersLanding({ searchParams }: { searchParams: Promise<Search> }
               {listLabel}
             </Link>
           </article>
-          <article className="bg-pine-d px-6 py-10 text-white sm:px-11">
+          <article className="bg-pine-d p-8 text-white md:p-11">
             <p className="text-xs tracking-[0.14em] text-[#b9c9bd] uppercase">
               Furnished Keys managed
             </p>
@@ -146,11 +144,9 @@ async function OwnersLanding({ searchParams }: { searchParams: Promise<Search> }
             </p>
             <ul className="mt-8">
               {managedPoints.map((point) => (
-                <li key={point} className="border-t border-white/15 py-3 text-[15px] leading-relaxed">
-                  <span className="text-[#c9d5cc]" aria-hidden="true">
-                    —{" "}
-                  </span>
-                  {point}
+                <li key={point} className="flex items-start gap-3 border-t border-white/15 py-3 text-[15px] leading-relaxed">
+                  <span aria-hidden="true" className="mt-[0.7em] h-px w-2.5 shrink-0 bg-[#c9d5cc]" />
+                  <span>{point}</span>
                 </li>
               ))}
             </ul>
@@ -165,7 +161,7 @@ async function OwnersLanding({ searchParams }: { searchParams: Promise<Search> }
       </section>
 
       <section className="border-t border-line">
-        <div className="shell grid gap-8 py-16 lg:grid-cols-[minmax(0,420px)_1fr] lg:py-20">
+        <div className="shell grid gap-8 py-16 md:grid-cols-[420px_minmax(0,1fr)] md:py-20">
           <h2 className="font-serif text-[clamp(2.25rem,4vw,3.25rem)] leading-[1.05] font-normal tracking-[-0.6px]">
             Who&apos;s renting
           </h2>
@@ -191,10 +187,10 @@ async function OwnersLanding({ searchParams }: { searchParams: Promise<Search> }
           <h2 className="font-serif text-[clamp(2.25rem,4vw,3.25rem)] leading-[1.05] font-normal tracking-[-0.6px]">
             How it works
           </h2>
-          <ol className="mt-8 grid list-none gap-8 border-t border-ink lg:grid-cols-3">
+          <ol className="mt-2.5 grid list-none border-t border-ink md:grid-cols-3">
             {steps.map((step) => (
-              <li key={step.n} className="pt-6">
-                <p className="font-serif text-[2.75rem] text-pine italic">{step.n}</p>
+              <li key={step.n} className="pt-7 pr-6 md:pr-8">
+                <p className="font-serif text-[44px] text-pine italic">{step.n}</p>
                 <p className="mt-2 max-w-[28ch] text-[17px] leading-relaxed">{step.body}</p>
               </li>
             ))}
@@ -202,9 +198,9 @@ async function OwnersLanding({ searchParams }: { searchParams: Promise<Search> }
         </div>
       </section>
 
-      <section id="assessment" className="bg-stone">
-        <div className="shell grid gap-10 py-16 lg:grid-cols-[minmax(0,440px)_1fr] lg:py-20">
-          <div>
+      <section id="assessment" className="scroll-mt-6 bg-stone">
+        <div className="grid items-start gap-10 px-5 py-12 md:grid-cols-2 md:gap-8 md:px-8 lg:grid-cols-[440px_minmax(0,1fr)] lg:gap-0 lg:px-0 lg:py-0">
+          <div className="lg:my-12 lg:pr-8 lg:pl-[max(1.25rem,calc((100vw-1200px)/2))]">
             <p className="text-xs tracking-[0.14em] text-muted uppercase">Free, no obligation</p>
             <h2 className="mt-3 font-serif text-[clamp(2.25rem,4vw,3.25rem)] leading-[1.05] font-normal tracking-[-0.6px]">
               Get a rental assessment

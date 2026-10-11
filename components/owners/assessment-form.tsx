@@ -53,7 +53,7 @@ export function AssessmentForm({ source }: { source: string }) {
 
   if (state.success) {
     return (
-      <div className="bg-surface px-6 py-10 shadow-search sm:px-10" role="status">
+      <div className="w-full bg-surface p-6 shadow-search md:p-10 lg:my-12 lg:mr-[120px]" role="status">
         <p className="font-serif text-3xl leading-none">Request received</p>
         <p className="mt-3 max-w-md text-sm leading-relaxed text-muted">
           We&apos;ll follow up by email about what it could rent for and how we&apos;d work together.
@@ -63,7 +63,7 @@ export function AssessmentForm({ source }: { source: string }) {
   }
 
   return (
-    <form action={formAction} noValidate className="bg-surface px-5 py-8 shadow-search sm:px-10 sm:py-10">
+    <form action={formAction} noValidate className="w-full bg-surface p-6 shadow-search md:p-10 lg:my-12 lg:mr-[120px]">
       {source ? <input type="hidden" name="source" value={source} /> : null}
       <div className="grid gap-5">
         <Field label="Property address" name="propertyAddress" error={state.fieldErrors?.propertyAddress}>
@@ -98,7 +98,7 @@ export function AssessmentForm({ source }: { source: string }) {
               aria-invalid={Boolean(state.fieldErrors?.currentUse)}
               className="h-[46px] w-full bg-transparent text-base"
             >
-              <option value="">Select current use</option>
+              <option value="">Vacant...</option>
               {currentUses.map((value) => (
                 <option key={value} value={value}>
                   {value}
@@ -112,7 +112,8 @@ export function AssessmentForm({ source }: { source: string }) {
             <input
               id="availableFrom"
               name="availableFrom"
-              type="date"
+              type="text"
+              placeholder="e.g. December 1"
               aria-invalid={Boolean(state.fieldErrors?.availableFrom)}
               className="h-[46px] w-full bg-transparent text-base"
             />
@@ -125,7 +126,7 @@ export function AssessmentForm({ source }: { source: string }) {
               aria-invalid={Boolean(state.fieldErrors?.interest)}
               className="h-[46px] w-full bg-transparent text-base"
             >
-              <option value="">Not sure yet…</option>
+              <option value="">Not sure yet...</option>
               {interests.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
@@ -177,7 +178,7 @@ export function AssessmentForm({ source }: { source: string }) {
             rows={4}
             placeholder="Optional"
             aria-invalid={Boolean(state.fieldErrors?.notes)}
-            className="w-full border border-line px-3 py-2.5 text-base"
+            className="w-full rounded-[2px] border border-line px-3 py-2.5 text-base"
           />
           {state.fieldErrors?.notes ? (
             <span className="mt-1 block text-xs text-warn">{state.fieldErrors.notes}</span>
@@ -222,7 +223,7 @@ function Field({
       <span className="mb-1.5 block text-[10px] tracking-[0.1em] text-muted uppercase">
         {label}
       </span>
-      <span className="block border border-line px-3">{children}</span>
+      <span className="block rounded-[2px] border border-line px-3">{children}</span>
       {error ? <span className="mt-1 block text-xs text-warn">{error}</span> : null}
     </label>
   );
@@ -246,7 +247,7 @@ function Segment({
         {options.map((option) => (
           <label key={option.value} className="cursor-pointer">
             <input type="radio" name={name} value={option.value} className="peer sr-only" />
-            <span className="inline-block rounded-[2px] border border-line px-3 py-2.5 text-sm peer-checked:border-pine peer-checked:bg-pine-l peer-checked:font-semibold peer-checked:text-pine-d">
+            <span className="inline-block rounded-[2px] border border-line px-3 py-2.5 text-sm peer-checked:border-transparent peer-checked:bg-pine-l peer-checked:text-pine-d peer-checked:shadow-[inset_0_0_0_1px_var(--pine)]">
               {option.label}
             </span>
           </label>

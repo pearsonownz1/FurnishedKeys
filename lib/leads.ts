@@ -105,8 +105,8 @@ export function validateOwnerLead(input: OwnerLeadInput): OwnerLeadResult {
   if (input.currentUse.length > 200) {
     fieldErrors.currentUse = "Shorten the current use.";
   }
-  if (input.availableFrom && !datePattern.test(input.availableFrom)) {
-    fieldErrors.availableFrom = "Choose a date.";
+  if (input.availableFrom.length > 80) {
+    fieldErrors.availableFrom = "Shorten the date.";
   }
   if (input.notes.length > 8000) {
     fieldErrors.notes = "Shorten the note.";
