@@ -32,7 +32,11 @@ export async function loadOwnerBoard(): Promise<{
   if (ids.length > 0) {
     const [windows, inquiryRows] = await Promise.all([
       supabase.from("availability_windows").select("*").in("listing_id", ids),
-      supabase.from("inquiries").select("*").in("listing_id", ids).eq("status", "new"),
+      supabase
+        .from("inquiries")
+        .select("*")
+        .in("listing_id", ids)
+        .in("status", ["new", "responded"]),
     ]);
     if (windows.error) throw new Error(windows.error.message);
     if (inquiryRows.error) throw new Error(inquiryRows.error.message);
@@ -51,6 +55,14 @@ export async function loadOwnerBoard(): Promise<{
         name: inquiry.name,
         message: inquiry.message,
         createdAt: inquiry.created_at,
+        email: inquiry.email,
+        phone: inquiry.phone,
+        move_in: inquiry.move_in,
+        move_out: inquiry.move_out,
+        occupants: inquiry.occupants,
+        pets: inquiry.pets,
+        status: inquiry.status,
+        created_at: inquiry.created_at,
       });
     }
   }

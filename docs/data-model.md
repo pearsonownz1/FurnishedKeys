@@ -96,15 +96,44 @@ Rent stays on `listings.monthly_rent_cents`. Utilities, deposits, cleaning, pet,
 
 `renter_id` is null for a signed-out visitor. `status` is `new | responded | closed`, default `new`. `assigned_to` may point at a `manager` or `admin` profile.
 
-Anonymous and signed-in visitors can insert a row with `status = new`, `assigned_to` null, and `renter_id` null or their own id. They cannot read it back unless they are signed in and `renter_id` is their id. The listing owner, the assignee, and admins can read the thread. Owners and assignees can update `status` and `assigned_to` only. Admins can edit the rest.
+Anonymous and signed-in visitors can insert a row with `status = new`, `assigned_to` null, and `renter_id` null or their own id, and only when `private.listing_is_public(listing_id)` is true and the listing is not a demo (`private.listing_is_demo`). They cannot read it back unless they are signed in and `renter_id` is their id. The listing owner, the assignee, and admins can read the thread. Owners and assignees can update `status` and `assigned_to` only. Admins can edit the rest.
 
-After that insert succeeds, the server emails the listing owner. The id is chosen before the insert so the message can link to `/owner#inquiry-{id}` without reading the row back. The HTML includes the listing title, the renter's name, desired dates, occupants, pets (or "None"), and message. Reply-To is the renter's email. The owner's address is read with the service role from `profiles`. A missing `RESEND_API_KEY` logs the email and does not send. A lookup or send failure is logged and the inquiry still succeeds.
+`submitInquiry` refuses a demo listing before any insert or email: `{ ok: false, formError: "This is a sample listing, so it can't take inquiries. Browse real homes at /rentals." }`.
+
+After a real insert succeeds, the server emails the listing owner. The id is chosen before the insert so the message can link to `/owner#inquiry-{id}` without reading the row back. The HTML includes the listing title, the renter's name, email, phone (or "None"), desired dates, occupants, pets (or "None"), and message. Reply-To is the renter's email. The owner's address is read with the service role from `profiles`. A missing `RESEND_API_KEY` logs the email and does not send. Any `to` address that ends in `.example` is logged as `skipped:example-domain` and is not sent. A lookup or send failure is logged and the inquiry still succeeds.
+
+The owner board loads inquiries with `status` in `new` or `responded`. Each board inquiry keeps `id`, `listingTitle`, `name`, `message`, and `createdAt`, and also includes `email`, `phone`, `move_in`, `move_out`, `occupants`, `pets`, `status`, and `created_at`.
 
 ### `messages`
 
 `id`, `inquiry_id`, `sender_id`, `body`, `created_at`.
 
 Thread replies. `sender_id` is null only so a later system note can exist. Signed-in participants insert with `sender_id` equal to themselves. Participants do not update messages. Admins can delete.
+
+### Owner reply (`replyToInquiry`)
+
+Exported from `app/(site)/owner/actions.ts` for the owner board. Front End posts a form; do not add the form in this change.
+
+```
+replyToInquiry(previousState, formData) => ReplyActionState
+```
+
+`formData` fields:
+
+- `inquiryId` — uuid
+- `body` — string, trimmed, 1 to 8000 characters
+
+`ReplyActionState` is `{ ok: boolean, success?: boolean, formError?: string }`.
+
+| Result | Response |
+| --- | --- |
+| No session | `{ ok: false, formError: "Sign in again." }` |
+| `inquiryId` is not a uuid, or the signed-in user cannot read that inquiry | `{ ok: false, formError: "That inquiry is not on your board." }` |
+| `body` is empty or longer than 8000 characters | `{ ok: false, formError: "Write a reply between 1 and 8000 characters." }` |
+| Message insert or status update fails | `{ ok: false, formError: "We couldn't send this. Please try again." }` |
+| Success | `{ ok: true, success: true }` |
+
+On success the action uses the signed-in user's client (RLS). It inserts `messages` `{ inquiry_id, sender_id, body }`, sets the inquiry `status` to `responded`, then emails the renter: `to` is `inquiries.email`, subject is `Re: your inquiry for <title>`, the body is HTML-escaped, and `replyTo` is the owner's `profiles.email`. A mail failure is logged and the action still returns success.
 
 ### `owner_leads`
 
@@ -118,6 +147,8 @@ Management consultation form.
 - `source`: short slug, default `web`. The format check `^[a-z0-9_-]{1,40}$` accepts `web`, `mailer`, and `letter`. It is not a closed list.
 
 Anyone can insert a new, unassigned lead, including `interest` and `source`. The insert policy only requires `status = new` and `assigned_to` null, and the insert grant is table-level, so both columns are writable. Visitors cannot read the row back. `manager` and `admin` profiles can read and update the inbox. `assigned_to` must be a manager or admin.
+
+After a successful insert, `submitOwnerLead` emails `LEADS_NOTIFY_TO` or, when that is unset, `guy@gcs.org`. The subject is `New owner lead: <interest> – <property address>`. Every field in the HTML is escaped. Reply-To is the lead's email. A mail failure is logged. The action still returns `{ ok: true, success: true }`.
 
 ## Address privacy
 
@@ -210,10 +241,10 @@ There are no refunds. Rejecting a listing sets `cancel_at_period_end` when Strip
 - `POST /api/listings/[id]/photos` — signed upload URLs under `listing-photos/<listing_id>/...`. 422 when the listing would exceed 20 photos.
 - `POST /api/listings/[id]/checkout` — `{ client_secret }` when Stripe is configured. Without `STRIPE_SECRET_KEY`, `{ waived: true, paid_through }`.
 - `GET /api/listings/[id]/checkout/status?session_id=` — `{ status, paid_through }`. A waived listing returns `{ status: "waived", paid_through }` and does not need `session_id`.
-- `POST /api/listings/[id]/submit` — does not charge and does not check the fee. 422 `{ missing }` lists any of `title`, `description`, `rent`, `min_stay`, `bedroom`, `bathrooms`, `photo`, and `cover` that are absent. If photos exist and none is the cover, submit marks the first by `sort` before that check. A complete listing becomes `pending_review`.
+- `POST /api/listings/[id]/submit` — does not charge and does not check the fee. 422 `{ missing }` lists any of `title`, `description`, `rent`, `min_stay`, `bedroom`, `bathrooms`, `photo`, and `cover` that are absent. If photos exist and none is the cover, submit marks the first by `sort` before that check. A complete listing becomes `pending_review`. After that status write, the server calls `revalidatePath` on `/rentals/<slug>`, `/rentals`, and `/`.
 - `POST /api/listings/[id]/cancel-renewal` and `DELETE` — owner only. 503 when Stripe is not configured.
 - `POST /api/stripe/webhook`
-- `POST /api/admin/listings/[id]/review` — `{ action: approve | request_changes | reject, note? }`. `note` is required for request changes and reject. Approve sets `approved` when the same completeness list is empty, with no fee check. Request changes sets `changes_requested`. Reject sets `rejected` and cancels renewal at period end when Stripe is configured. After the status write succeeds, the owner is emailed: approved, changes requested (the note is in the message), or rejected (the note is in the message). A mail failure does not change the JSON response. `EMAIL_FROM` is the From address. With no `RESEND_API_KEY`, the email is logged and not sent.
+- `POST /api/admin/listings/[id]/review` — `{ action: approve | request_changes | reject, note? }`. `note` is required for request changes and reject. Approve sets `approved` when the same completeness list is empty, with no fee check. Request changes sets `changes_requested`. Reject sets `rejected` and cancels renewal at period end when Stripe is configured. After each successful status write, the server calls `revalidatePath` on `/rentals/<slug>` (when the listing has a slug), `/rentals`, and `/`, then emails the owner: approved, changes requested (the note is in the message), or rejected (the note is in the message). A mail failure does not change the JSON response. `EMAIL_FROM` is the From address. With no `RESEND_API_KEY`, the email is logged and not sent. Addresses ending in `.example` are not sent.
 - `POST /api/admin/listings/[id]/waive` — sets `listing_fee_status = waived`. Admin only.
 
 Front end Embedded Checkout needs `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`. The webhook endpoint to register is `https://furnishedkeys.com/api/stripe/webhook`.

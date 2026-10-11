@@ -1,17 +1,27 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { revalidatePath } from "next/cache";
 import { POST as review } from "@/app/api/admin/listings/[id]/review/route";
+import { submitOwnerLead } from "@/app/(site)/owners/actions";
 import { submitInquiry } from "@/app/(site)/rentals/actions";
 import { loadOwnerListing, loadRole, loadSetupState, sessionUser } from "@/lib/api/owner-listing";
 import {
+  DEFAULT_LEADS_NOTIFY_TO,
   deliverInquiryNotice,
+  deliverInquiryReply,
+  deliverOwnerLeadNotice,
   deliverReviewDecision,
   inquiryNoticeHtml,
+  ownerLeadNoticeHtml,
   reviewNoticeHtml,
   sendEmail,
 } from "@/lib/email";
 import { getPublicListings } from "@/lib/listings";
 import { createPublicClient } from "@/lib/supabase/public";
 import { createServiceClient } from "@/lib/supabase/service";
+
+vi.mock("next/cache", () => ({
+  revalidatePath: vi.fn(),
+}));
 
 vi.mock("@/lib/api/owner-listing", () => ({
   sessionUser: vi.fn(),
@@ -96,6 +106,28 @@ describe("sendEmail", () => {
     info.mockRestore();
   });
 
+  it("skips addresses that end in .example and does not call Resend", async () => {
+    vi.stubEnv("RESEND_API_KEY", "re_test_key");
+    vi.stubEnv("EMAIL_FROM", "Furnished Keys <hello@furnishedkeys.com>");
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+
+    const result = await sendEmail({
+      to: "renter@mail.example",
+      subject: "New inquiry",
+      html: "<p>Hello</p>",
+    });
+
+    expect(result).toEqual({ id: null, detail: "skipped:example-domain" });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(info).toHaveBeenCalledWith(
+      "email skipped (example domain)",
+      expect.objectContaining({ to: "renter@mail.example", detail: "skipped:example-domain" }),
+    );
+    info.mockRestore();
+  });
+
   it("posts to Resend and returns the id", async () => {
     vi.stubEnv("RESEND_API_KEY", "re_test_key");
     vi.stubEnv("EMAIL_FROM", "Furnished Keys <hello@furnishedkeys.com>");
@@ -155,6 +187,8 @@ describe("notice html", () => {
     const html = inquiryNoticeHtml({
       listingTitle: "Pine <ADU>",
       renterName: "Ada <Lovelace>",
+      renterEmail: "ada@<example>.com",
+      renterPhone: "541-555-0100",
       moveIn: "2026-11-01",
       moveOut: "2027-02-01",
       occupants: 2,
@@ -164,6 +198,8 @@ describe("notice html", () => {
     });
     expect(html).toContain("Pine &lt;ADU&gt;");
     expect(html).toContain("Ada &lt;Lovelace&gt;");
+    expect(html).toContain("ada@&lt;example&gt;.com");
+    expect(html).toContain("541-555-0100");
     expect(html).toContain("2026-11-01 to 2027-02-01");
     expect(html).toContain("Occupants");
     expect(html).toContain(">2<");
@@ -204,6 +240,7 @@ describe("deliverInquiryNotice", () => {
       inquiryId,
       renterName: "Ada",
       renterEmail: "ada@example.com",
+      renterPhone: "541-555-0100",
       moveIn: "2026-11-01",
       moveOut: "2027-02-01",
       occupants: 2,
@@ -216,6 +253,8 @@ describe("deliverInquiryNotice", () => {
     expect(body.reply_to).toBe("ada@example.com");
     expect(body.subject).toBe("New inquiry for Pine ADU");
     expect(body.html).toContain("1 dog");
+    expect(body.html).toContain("ada@example.com");
+    expect(body.html).toContain("541-555-0100");
     expect(body.html).toContain(`#inquiry-${inquiryId}`);
   });
 
@@ -229,6 +268,7 @@ describe("deliverInquiryNotice", () => {
         inquiryId,
         renterName: "Ada",
         renterEmail: "ada@example.com",
+        renterPhone: null,
         moveIn: "2026-11-01",
         moveOut: "2027-02-01",
         occupants: 1,
@@ -279,6 +319,7 @@ describe("submitInquiry", () => {
         ownerId,
         listingTitle: "Pine ADU",
         renterEmail: "ada@example.com",
+        renterPhone: "541-555-0100",
         pets: "1 dog",
       }),
     );
@@ -310,6 +351,37 @@ describe("submitInquiry", () => {
     const result = await submitInquiry({ ok: false }, form({ pets: "" }));
 
     expect(result.ok).toBe(false);
+    expect(email).not.toHaveBeenCalled();
+    email.mockRestore();
+  });
+
+  it("rejects a demo listing before insert or email", async () => {
+    vi.mocked(getPublicListings).mockResolvedValue([
+      {
+        id: listingId,
+        owner_id: ownerId,
+        title: "Sample ADU",
+        is_demo: true,
+        min_stay_months: 1,
+        max_occupants: 4,
+        pets_allowed: true,
+        availability_windows: [],
+      },
+    ] as unknown as Awaited<ReturnType<typeof getPublicListings>>);
+    const insert = vi.fn();
+    vi.mocked(createPublicClient).mockReturnValue({
+      from: () => ({ insert }),
+    } as unknown as ReturnType<typeof createPublicClient>);
+    const email = vi.spyOn(await import("@/lib/email"), "deliverInquiryNotice");
+
+    const result = await submitInquiry({ ok: false }, form());
+
+    expect(result).toEqual({
+      ok: false,
+      formError:
+        "This is a sample listing, so it can't take inquiries. Browse real homes at /rentals.",
+    });
+    expect(insert).not.toHaveBeenCalled();
     expect(email).not.toHaveBeenCalled();
     email.mockRestore();
   });
@@ -372,6 +444,9 @@ describe("POST /api/admin/listings/[id]/review emails", () => {
       context,
     );
     expect(approved.status).toBe(200);
+    expect(revalidatePath).toHaveBeenCalledWith("/rentals/pine-adu");
+    expect(revalidatePath).toHaveBeenCalledWith("/rentals");
+    expect(revalidatePath).toHaveBeenCalledWith("/");
     const approvedBody = JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body));
     expect(approvedBody.subject).toBe("Listing approved: Pine ADU");
     expect(approvedBody.html).toContain("is approved");
@@ -443,5 +518,152 @@ describe("deliverReviewDecision", () => {
         origin: "https://furnishedkeys.com",
       }),
     ).resolves.toBeUndefined();
+  });
+});
+
+describe("deliverInquiryReply", () => {
+  it("emails the renter with the owner's reply-to and an escaped body", async () => {
+    vi.stubEnv("RESEND_API_KEY", "re_test_key");
+    vi.stubEnv("EMAIL_FROM", "Furnished Keys <hello@furnishedkeys.com>");
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: "re_reply" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    vi.spyOn(console, "info").mockImplementation(() => {});
+
+    const result = await deliverInquiryReply({
+      to: "delivered+renter@resend.dev",
+      listingTitle: "Pine ADU",
+      body: "Yes.\n<script>",
+      replyTo: "delivered+owner@resend.dev",
+    });
+
+    expect(result).toEqual({ id: "re_reply", detail: "sent:re_reply" });
+    const body = JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body));
+    expect(body.to).toEqual(["delivered+renter@resend.dev"]);
+    expect(body.subject).toBe("Re: your inquiry for Pine ADU");
+    expect(body.reply_to).toBe("delivered+owner@resend.dev");
+    expect(body.html).toContain("Yes.<br>&lt;script&gt;");
+    expect(body.html).not.toContain("<script>");
+  });
+});
+
+describe("deliverOwnerLeadNotice", () => {
+  const lead = {
+    name: "Guy <script>",
+    email: "owner@example.com",
+    phone: "541-555-0199",
+    interest: "full_management",
+    propertyType: "house",
+    furnished: "yes",
+    locationId: "c3a1e0b2-4d5f-4a6b-8c7d-111111111101",
+    propertyAddress: "10 <Pine> St",
+    currentUse: "vacant",
+    availableFrom: "2026-12-01",
+    notes: "Call after 5",
+    source: "web",
+  };
+
+  it("sends to LEADS_NOTIFY_TO, escapes fields, and sets reply-to", async () => {
+    vi.stubEnv("RESEND_API_KEY", "re_test_key");
+    vi.stubEnv("EMAIL_FROM", "Furnished Keys <hello@furnishedkeys.com>");
+    vi.stubEnv("LEADS_NOTIFY_TO", "delivered+leads@resend.dev");
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: "re_lead" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    vi.spyOn(console, "info").mockImplementation(() => {});
+
+    const result = await deliverOwnerLeadNotice(lead);
+
+    expect(result).toEqual({ id: "re_lead", detail: "sent:re_lead" });
+    const body = JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body));
+    expect(body.to).toEqual(["delivered+leads@resend.dev"]);
+    expect(body.subject).toBe("New owner lead: full_management – 10 <Pine> St");
+    expect(body.reply_to).toBe("owner@example.com");
+    expect(body.html).toContain("Guy &lt;script&gt;");
+    expect(body.html).toContain("10 &lt;Pine&gt; St");
+    expect(body.html).toContain("Bend");
+    expect(body.html).not.toContain("<script>");
+    expect(ownerLeadNoticeHtml(lead)).toContain("full_management");
+  });
+
+  it("falls back to Guy's address when LEADS_NOTIFY_TO is unset", async () => {
+    vi.stubEnv("RESEND_API_KEY", "re_test_key");
+    vi.stubEnv("EMAIL_FROM", "Furnished Keys <hello@furnishedkeys.com>");
+    vi.stubEnv("LEADS_NOTIFY_TO", "");
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: "re_lead_default" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    vi.spyOn(console, "info").mockImplementation(() => {});
+
+    await deliverOwnerLeadNotice(lead);
+
+    const body = JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body));
+    expect(body.to).toEqual([DEFAULT_LEADS_NOTIFY_TO]);
+  });
+});
+
+describe("submitOwnerLead", () => {
+  function leadForm() {
+    const data = new FormData();
+    data.set("name", "Pat Owner");
+    data.set("email", "pat@example.com");
+    data.set("phone", "541-555-0142");
+    data.set("interest", "list_myself");
+    data.set("propertyType", "adu");
+    data.set("furnished", "partly");
+    data.set("locationId", "c3a1e0b2-4d5f-4a6b-8c7d-111111111101");
+    data.set("propertyAddress", "20 Sample St");
+    data.set("currentUse", "second home");
+    data.set("availableFrom", "2026-11-15");
+    data.set("notes", "Ask about winter");
+    data.set("source", "web");
+    return data;
+  }
+
+  it("emails after a successful insert and still succeeds when email throws", async () => {
+    const insert = vi.fn().mockResolvedValue({ error: null });
+    vi.mocked(createPublicClient).mockReturnValue({
+      from: () => ({ insert }),
+    } as unknown as ReturnType<typeof createPublicClient>);
+    const email = vi.spyOn(await import("@/lib/email"), "deliverOwnerLeadNotice");
+    email.mockRejectedValueOnce(new Error("resend down"));
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const result = await submitOwnerLead({ ok: false }, leadForm());
+
+    expect(result).toEqual({ ok: true, success: true });
+    expect(insert).toHaveBeenCalled();
+    expect(email).toHaveBeenCalledWith(
+      expect.objectContaining({
+        email: "pat@example.com",
+        interest: "list_myself",
+        propertyAddress: "20 Sample St",
+      }),
+    );
+    expect(logged).toHaveBeenCalledWith("owner lead email failed", "resend down");
+    email.mockRestore();
+    logged.mockRestore();
+  });
+
+  it("does not email when the insert fails", async () => {
+    vi.mocked(createPublicClient).mockReturnValue({
+      from: () => ({
+        insert: vi.fn().mockResolvedValue({ error: { message: "no", code: "42501" } }),
+      }),
+    } as unknown as ReturnType<typeof createPublicClient>);
+    const email = vi.spyOn(await import("@/lib/email"), "deliverOwnerLeadNotice");
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const result = await submitOwnerLead({ ok: false }, leadForm());
+
+    expect(result.ok).toBe(false);
+    expect(email).not.toHaveBeenCalled();
+    email.mockRestore();
   });
 });

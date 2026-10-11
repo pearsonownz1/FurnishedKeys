@@ -77,6 +77,17 @@ describe("toInquiryInsert", () => {
     expect(action).not.toMatch(/\.single\(/);
     const insertAt = action.indexOf(".insert(");
     const emailAt = action.indexOf("await deliverInquiryNotice");
+    const demoAt = action.indexOf("listing.is_demo");
+    expect(demoAt).toBeGreaterThan(-1);
+    expect(demoAt).toBeLessThan(insertAt);
     expect(emailAt).toBeGreaterThan(insertAt);
+
+    const policy = readFileSync(
+      new URL("../supabase/migrations/20261011112445_inquiries_public_non_demo.sql", import.meta.url),
+      "utf8",
+    );
+    expect(policy).toContain("private.listing_is_public(listing_id)");
+    expect(policy).toContain("not (select private.listing_is_demo(listing_id))");
+    expect(policy).toContain("policy inquiries_insert");
   });
 });

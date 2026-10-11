@@ -2,6 +2,7 @@ import { accessDenied, jsonError } from "@/lib/api/http";
 import { loadSetupState } from "@/lib/api/owner-listing";
 import { openOwnerListing, readOwnerListing } from "@/lib/api/read-owner-listing";
 import { missingSubmitFields, requireEditableListing, slugFromTitle } from "@/lib/listings/access";
+import { revalidateListingPaths } from "@/lib/listings/revalidate-public";
 import { coverPhotoId } from "@/lib/listings/setup";
 
 type Context = { params: Promise<{ id: string }> };
@@ -34,14 +35,16 @@ export async function POST(_request: Request, context: Context) {
     return jsonError(422, "Listing is incomplete", { missing });
   }
 
+  const slug = listing.slug ?? slugFromTitle(listing.title ?? "listing");
   const updated = await supabase
     .from("listings")
     .update({
       status: "pending_review",
-      slug: listing.slug ?? slugFromTitle(listing.title ?? "listing"),
+      slug,
     })
     .eq("id", id);
   if (updated.error) return jsonError(400, updated.error.message);
+  revalidateListingPaths(slug);
 
   const next = await readOwnerListing(supabase, id);
   if (!next.ok) return next.response;
