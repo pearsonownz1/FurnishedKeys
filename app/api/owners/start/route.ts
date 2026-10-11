@@ -6,14 +6,23 @@ import { serverNotConfigured } from "@/lib/stripe/config";
 import { sessionUser } from "@/lib/api/owner-listing";
 import { createServiceClient } from "@/lib/supabase/service";
 
+const SIGN_IN_HINT =
+  "An account with this email already exists. Sign in, then start the listing again.";
+
+function emailAlreadyRegistered(error: { message?: string; code?: string }): boolean {
+  if (error.code === "email_exists" || error.code === "user_already_exists") return true;
+  return /already registered|already exists|already been/i.test(error.message ?? "");
+}
+
 /**
  * Anonymous visitors are not sent through signInWithOtp: that cannot return a
- * listing id until the email link is opened, and the sign-in page is not built.
- * This route creates a confirmed user with the admin API when there is no
- * session, then calls signUp on the cookie client so a session is stored when
- * Supabase returns one (email confirmation off). The password is random and is
- * not returned. An email that already has an account gets 401 and must sign in.
- * Signed-in callers are reused. The response is always `{ listing_id }`.
+ * listing id until the email link is opened. Email confirmation is on, so
+ * signUp would create an unconfirmed user with no session and later owner
+ * requests would run as anon. This route creates a confirmed user with the
+ * admin API, then signInWithPassword on the cookie client so the session
+ * cookie is set. The password is random and is not returned. An email that
+ * already has an account gets 401 and must sign in. Signed-in callers are reused.
+ * The response is always `{ listing_id }`.
  */
 export async function POST(request: Request) {
   let body: unknown;
@@ -40,29 +49,28 @@ export async function POST(request: Request) {
 
   if (!userId) {
     const password = randomBytes(24).toString("base64url");
-    const signedUp = await supabase.auth.signUp({
+    const created = await service.auth.admin.createUser({
       email: parsed.data.email,
       password,
-      options: { data: { full_name: parsed.data.full_name } },
+      email_confirm: true,
+      user_metadata: { full_name: parsed.data.full_name },
     });
-    if (signedUp.error) {
-      const duplicate = /already registered|already exists|already been/i.test(
-        signedUp.error.message,
-      );
-      if (duplicate) {
-        return jsonError(401, "Sign in required", {
-          hint: "An account with this email already exists. Sign in, then start the listing again.",
-        });
+    if (created.error) {
+      if (emailAlreadyRegistered(created.error)) {
+        return jsonError(401, "Sign in required", { hint: SIGN_IN_HINT });
       }
-      return jsonError(400, signedUp.error.message);
+      return jsonError(400, created.error.message);
     }
-    const created = signedUp.data.user;
-    if (!created || (created.identities?.length ?? 0) === 0) {
-      return jsonError(401, "Sign in required", {
-        hint: "An account with this email already exists. Sign in, then start the listing again.",
-      });
+    if (!created.data.user) return jsonError(500, "Could not start the session");
+
+    const signedIn = await supabase.auth.signInWithPassword({
+      email: parsed.data.email,
+      password,
+    });
+    if (signedIn.error || !signedIn.data.session) {
+      return jsonError(500, "Could not start the session");
     }
-    userId = created.id;
+    userId = created.data.user.id;
   }
 
   const { data: location, error: locationError } = await service

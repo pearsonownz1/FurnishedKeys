@@ -1,5 +1,6 @@
 import { accessDenied, invalidBody, jsonError, readJson } from "@/lib/api/http";
-import { loadOwnerListing, loadRole, loadSetupState, sessionUser } from "@/lib/api/owner-listing";
+import { loadRole, loadSetupState, sessionUser, type AppClient } from "@/lib/api/owner-listing";
+import { readOwnerListing } from "@/lib/api/read-owner-listing";
 import { feeCoversListing, missingSubmitFields, requireAdmin } from "@/lib/listings/access";
 import { reviewSchema } from "@/lib/listings/schemas";
 import { periodEndFromSubscription, recordCancellation } from "@/lib/stripe/apply-fee";
@@ -16,8 +17,10 @@ export async function POST(request: Request, context: Context) {
   const allowed = requireAdmin(user.id, role);
   if (!allowed.ok) return accessDenied(allowed);
 
-  const listing = await loadOwnerListing(supabase, id);
-  if (!listing) return jsonError(404, "Listing not found");
+  const loaded = await readOwnerListing(supabase, id);
+  if (!loaded.ok) return loaded.response;
+  if (!loaded.listing) return jsonError(404, "Listing not found");
+  const listing = loaded.listing;
 
   let body: unknown;
   try {
@@ -58,7 +61,7 @@ export async function POST(request: Request, context: Context) {
       })
       .eq("id", id);
     if (updated.error) return jsonError(400, updated.error.message);
-    return Response.json({ listing: await loadOwnerListing(supabase, id) });
+    return listingJson(supabase, id);
   }
 
   if (parsed.data.action === "request_changes") {
@@ -73,7 +76,7 @@ export async function POST(request: Request, context: Context) {
       })
       .eq("id", id);
     if (updated.error) return jsonError(400, updated.error.message);
-    return Response.json({ listing: await loadOwnerListing(supabase, id) });
+    return listingJson(supabase, id);
   }
 
   let renewalCanceled = listing.renewal_canceled;
@@ -108,5 +111,11 @@ export async function POST(request: Request, context: Context) {
     })
     .eq("id", id);
   if (updated.error) return jsonError(400, updated.error.message);
-  return Response.json({ listing: await loadOwnerListing(supabase, id) });
+  return listingJson(supabase, id);
+}
+
+async function listingJson(supabase: AppClient, id: string) {
+  const next = await readOwnerListing(supabase, id);
+  if (!next.ok) return next.response;
+  return Response.json({ listing: next.listing });
 }

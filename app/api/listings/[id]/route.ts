@@ -1,6 +1,6 @@
 import type { ListingUpdate } from "@/lib/db/types";
 import { accessDenied, invalidBody, jsonError, readJson } from "@/lib/api/http";
-import { loadOwnerListing, sessionUser } from "@/lib/api/owner-listing";
+import { openOwnerListing, readOwnerListing } from "@/lib/api/read-owner-listing";
 import { requireEditableListing, requireOwner } from "@/lib/listings/access";
 import { patchListingSchema } from "@/lib/listings/schemas";
 import { bedroomInserts } from "@/lib/listings/setup";
@@ -9,11 +9,11 @@ type Context = { params: Promise<{ id: string }> };
 
 export async function PATCH(request: Request, context: Context) {
   const { id } = await context.params;
-  const { supabase, user } = await sessionUser();
-  const listing = await loadOwnerListing(supabase, id);
-  if (!listing) return jsonError(404, "Listing not found");
+  const opened = await openOwnerListing(id);
+  if (!opened.ok) return opened.response;
+  const { supabase, user, listing } = opened;
 
-  const allowed = requireEditableListing(user?.id ?? null, listing);
+  const allowed = requireEditableListing(user.id, listing);
   if (!allowed.ok) return accessDenied(allowed);
 
   let body: unknown;
@@ -61,16 +61,17 @@ export async function PATCH(request: Request, context: Context) {
     }
   }
 
-  const next = await loadOwnerListing(supabase, id);
-  return Response.json({ listing: next });
+  const next = await readOwnerListing(supabase, id);
+  if (!next.ok) return next.response;
+  return Response.json({ listing: next.listing });
 }
 
 export async function GET(_request: Request, context: Context) {
   const { id } = await context.params;
-  const { supabase, user } = await sessionUser();
-  const listing = await loadOwnerListing(supabase, id);
-  if (!listing) return jsonError(404, "Listing not found");
-  const allowed = requireOwner(user?.id ?? null, listing.owner_id);
+  const opened = await openOwnerListing(id);
+  if (!opened.ok) return opened.response;
+  const { user, listing } = opened;
+  const allowed = requireOwner(user.id, listing.owner_id);
   if (!allowed.ok) return accessDenied(allowed);
   return Response.json({ listing });
 }

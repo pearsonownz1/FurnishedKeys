@@ -1,5 +1,5 @@
 import { accessDenied, invalidBody, jsonError, readJson, requestOrigin } from "@/lib/api/http";
-import { loadOwnerListing, sessionUser } from "@/lib/api/owner-listing";
+import { openOwnerListing } from "@/lib/api/read-owner-listing";
 import { feeCoversListing, requireOwner } from "@/lib/listings/access";
 import {
   feeAlreadyRecorded,
@@ -22,13 +22,11 @@ type Context = { params: Promise<{ id: string }> };
 
 export async function POST(request: Request, context: Context) {
   const { id } = await context.params;
-  const { supabase, user } = await sessionUser();
-  const listing = await loadOwnerListing(supabase, id);
-  if (!listing) return jsonError(404, "Listing not found");
-  const allowed = requireOwner(user?.id ?? null, listing.owner_id);
-  if (!allowed.ok || !user) {
-    return accessDenied(allowed.ok ? { ok: false, status: 401, error: "Sign in required" } : allowed);
-  }
+  const opened = await openOwnerListing(id);
+  if (!opened.ok) return opened.response;
+  const { user, listing } = opened;
+  const allowed = requireOwner(user.id, listing.owner_id);
+  if (!allowed.ok) return accessDenied(allowed);
 
   if (!paymentsConfigured()) {
     if (feeAlreadyRecorded(listing.listing_fee_status)) {

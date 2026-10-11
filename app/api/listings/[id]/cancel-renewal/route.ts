@@ -1,5 +1,5 @@
 import { accessDenied, jsonError } from "@/lib/api/http";
-import { loadOwnerListing, sessionUser } from "@/lib/api/owner-listing";
+import { openOwnerListing } from "@/lib/api/read-owner-listing";
 import { requireOwner } from "@/lib/listings/access";
 import { periodEndFromSubscription, recordCancellation } from "@/lib/stripe/apply-fee";
 import { getStripe, paymentsNotReady, serverNotConfigured } from "@/lib/stripe/config";
@@ -9,10 +9,10 @@ type Context = { params: Promise<{ id: string }> };
 
 async function setRenewal(context: Context, cancel: boolean) {
   const { id } = await context.params;
-  const { supabase, user } = await sessionUser();
-  const listing = await loadOwnerListing(supabase, id);
-  if (!listing) return jsonError(404, "Listing not found");
-  const allowed = requireOwner(user?.id ?? null, listing.owner_id);
+  const opened = await openOwnerListing(id);
+  if (!opened.ok) return opened.response;
+  const { listing } = opened;
+  const allowed = requireOwner(opened.user.id, listing.owner_id);
   if (!allowed.ok) return accessDenied(allowed);
   if (!listing.stripe_subscription_id) {
     return jsonError(409, "This listing has no subscription");

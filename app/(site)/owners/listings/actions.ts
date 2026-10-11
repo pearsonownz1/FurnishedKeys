@@ -1,6 +1,7 @@
 "use server";
 
-import { loadOwnerListing, sessionUser } from "@/lib/api/owner-listing";
+import { sessionUser, type AppClient, type OwnerListing } from "@/lib/api/owner-listing";
+import { readOwnerListing } from "@/lib/api/read-owner-listing";
 import type { FeeFrequency, FeeKind } from "@/lib/db/types";
 
 export type FeeInput = {
@@ -15,11 +16,9 @@ export async function saveListingFees(
   listingId: string,
   fees: FeeInput[],
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const { supabase, user } = await sessionUser();
-  const listing = await loadOwnerListing(supabase, listingId);
-  if (!listing || !user || listing.owner_id !== user.id) {
-    return { ok: false, error: "Sign in required" };
-  }
+  const owner = await ownerListing(listingId);
+  if (!owner.ok) return owner;
+  const { supabase } = owner;
 
   const removed = await supabase.from("listing_fees").delete().eq("listing_id", listingId);
   if (removed.error) return { ok: false, error: removed.error.message };
@@ -39,11 +38,20 @@ export async function saveListingFees(
   return { ok: true };
 }
 
-async function ownerListing(listingId: string) {
+async function ownerListing(
+  listingId: string,
+): Promise<{ ok: true; supabase: AppClient; listing: OwnerListing } | { ok: false; error: string }> {
   const { supabase, user } = await sessionUser();
-  const listing = await loadOwnerListing(supabase, listingId);
-  if (!listing || !user || listing.owner_id !== user.id) return null;
-  return { supabase, listing };
+  if (!user) return { ok: false, error: "Sign in required" };
+  const loaded = await readOwnerListing(supabase, listingId);
+  if (!loaded.ok) {
+    const body = (await loaded.response.json()) as { error?: string };
+    return { ok: false, error: body.error ?? "Could not load the listing" };
+  }
+  if (!loaded.listing || loaded.listing.owner_id !== user.id) {
+    return { ok: false, error: "Sign in required" };
+  }
+  return { ok: true, supabase, listing: loaded.listing };
 }
 
 export async function reorderListingPhotos(
@@ -51,7 +59,7 @@ export async function reorderListingPhotos(
   paths: string[],
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const owner = await ownerListing(listingId);
-  if (!owner) return { ok: false, error: "Sign in required" };
+  if (!owner.ok) return owner;
   for (let index = 0; index < paths.length; index += 1) {
     const path = paths[index];
     if (!path) continue;
@@ -71,7 +79,7 @@ export async function setListingCover(
   photoId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const owner = await ownerListing(listingId);
-  if (!owner) return { ok: false, error: "Sign in required" };
+  if (!owner.ok) return owner;
   const cleared = await owner.supabase
     .from("listing_photos")
     .update({ is_cover: false })

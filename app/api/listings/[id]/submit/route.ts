@@ -1,5 +1,6 @@
 import { accessDenied, jsonError, requestOrigin } from "@/lib/api/http";
-import { loadOwnerListing, loadSetupState, sessionUser } from "@/lib/api/owner-listing";
+import { loadSetupState } from "@/lib/api/owner-listing";
+import { openOwnerListing, readOwnerListing } from "@/lib/api/read-owner-listing";
 import {
   feeCoversListing,
   missingSubmitFields,
@@ -13,10 +14,10 @@ type Context = { params: Promise<{ id: string }> };
 
 export async function POST(request: Request, context: Context) {
   const { id } = await context.params;
-  const { supabase, user } = await sessionUser();
-  const listing = await loadOwnerListing(supabase, id);
-  if (!listing) return jsonError(404, "Listing not found");
-  const allowed = requireEditableListing(user?.id ?? null, listing);
+  const opened = await openOwnerListing(id);
+  if (!opened.ok) return opened.response;
+  const { supabase, user, listing } = opened;
+  const allowed = requireEditableListing(user.id, listing);
   if (!allowed.ok) return accessDenied(allowed);
 
   if (!feeCoversListing(listing, new Date())) {
@@ -55,6 +56,7 @@ export async function POST(request: Request, context: Context) {
     .eq("id", id);
   if (updated.error) return jsonError(400, updated.error.message);
 
-  const next = await loadOwnerListing(supabase, id);
-  return Response.json({ listing: next });
+  const next = await readOwnerListing(supabase, id);
+  if (!next.ok) return next.response;
+  return Response.json({ listing: next.listing });
 }
