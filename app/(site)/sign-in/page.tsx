@@ -1,24 +1,34 @@
-import Link from "next/link";
+import { connection } from "next/server";
+import { Suspense } from "react";
+import { SignInForm } from "@/components/auth/sign-in-form";
+import { safeNext } from "@/lib/auth-redirect";
 
 export const metadata = {
   title: "Sign in",
-  description: "Accounts are not open yet.",
+  description: "Email yourself a link to sign in.",
 };
 
-export default function SignInPage() {
+type Search = Record<string, string | string[] | undefined>;
+
+export default function SignInPage({ searchParams }: { searchParams: Promise<Search> }) {
+  return (
+    <Suspense fallback={<p className="px-5 py-16 text-muted">Loading…</p>}>
+      <SignIn searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function SignIn({ searchParams }: { searchParams: Promise<Search> }) {
+  await connection();
+  const params = await searchParams;
+  const raw = params.next;
+  const next = safeNext(Array.isArray(raw) ? raw[0] : raw);
+  const notice =
+    params.error === "link" ? "That sign-in link didn't work. Request a new one." : "";
+
   return (
     <div className="shell max-w-3xl py-14 lg:py-20">
-      <h1 className="font-serif text-[clamp(2.5rem,5vw,3.5rem)] leading-none font-normal tracking-[-0.8px]">
-        Sign in
-      </h1>
-      <p className="mt-5 max-w-xl text-[17px] leading-relaxed text-muted">
-        Accounts are not open yet. You can still browse furnished homes.
-      </p>
-      <p className="mt-8">
-        <Link href="/rentals" className="font-semibold text-pine">
-          Find a home
-        </Link>
-      </p>
+      <SignInForm next={next} notice={notice} />
     </div>
   );
 }

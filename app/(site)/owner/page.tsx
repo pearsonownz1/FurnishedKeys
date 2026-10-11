@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { connection } from "next/server";
+import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { ListingBoard } from "@/components/owner/listing-board";
 import { confirmationBanner, type BoardInquiry, type BoardListing } from "@/lib/owner-board";
@@ -28,16 +28,8 @@ async function OwnerDashboard() {
       <h1 className="mt-3 font-serif text-[clamp(2.75rem,5vw,4.5rem)] leading-none font-normal tracking-[-1px]">
         Your listings
       </h1>
-      {board && !board.signedIn ? (
-        <p className="mt-6 text-sm text-muted">
-          <Link href="/sign-in" className="font-semibold text-pine">
-            Sign in
-          </Link>{" "}
-          to see your listings and inquiries.
-        </p>
-      ) : (
-        <DashboardBody listings={board?.listings ?? []} inquiries={board?.inquiries ?? []} />
-      )}
+      {!board?.signedIn ? redirect("/sign-in?next=%2Fowner") : null}
+      <DashboardBody listings={board?.listings ?? []} inquiries={board?.inquiries ?? []} />
     </div>
   );
 }

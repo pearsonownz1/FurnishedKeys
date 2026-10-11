@@ -41,15 +41,23 @@ describe("checkout response", () => {
     expect(paidThroughMonthYear("2027-10-11T00:00:00.000Z")).toBe("Paid through Oct 2027");
   });
 
-  it("keeps Process payment on our page and mounts Stripe only with a secret and key", () => {
+  it("keeps pay on our page and mounts Stripe only with a secret and key", () => {
     const source = readFileSync("components/listing/checkout-panel.tsx", "utf8");
     const embed = readFileSync("components/listing/stripe-embed.tsx", "utf8");
     const route = readFileSync("app/api/listings/[id]/checkout/route.ts", "utf8");
     expect(source).toContain("parseCheckoutPost");
-    expect(source).toContain("Process payment");
-    expect(source).toContain("Renew automatically each year");
-    expect(source).toContain("Order summary");
+    expect(source).toContain("Pay {listingFeeAmount()} and set up my listing");
+    expect(source).toContain("Pay and start your listing");
+    expect(source).toContain("Your session ended.");
+    expect(source).toContain("Renew automatically each year.");
+    expect(source).toContain("Due today");
+    expect(source).not.toContain("Process payment");
+    expect(source).not.toContain("Order summary");
     expect(source).toContain("paid_through");
+    expect(source).toContain("console.error");
+    expect(source).toContain("/sign-in?next=");
+    expect(source).toContain("checkoutError");
+    expect(source).not.toContain("We couldn't start checkout");
     expect(source).toContain("clientSecret && publishableKey");
     expect(source).toContain("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY");
     expect(embed).toContain("loadStripe");
