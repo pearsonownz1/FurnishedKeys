@@ -7,12 +7,28 @@ import { sessionUser } from "@/lib/api/owner-listing";
 import { deliverRenterMessageNotice } from "@/lib/email";
 import { loadInbox, loadThread } from "@/lib/owner-dashboard-load";
 import {
+  agoLabel,
   applyBlockedDays,
+  confirmedAgo,
+  filterCounts,
+  firstName,
+  initials,
+  inquiryPreview,
+  listTime,
+  listingActions,
+  listingDetailLine,
   listingPercent,
+  listingStatusCaption,
   listingStatusGroup,
   listingStepProgress,
+  matchesListingFilter,
+  progressCaption,
   resumeHref,
+  setupProgress,
   stayHitsBlocked,
+  stayRange,
+  threadMessages,
+  type SetupSignals,
 } from "@/lib/owner-dashboard";
 import { revalidateListingPaths } from "@/lib/listings/revalidate-public";
 import { hashRenterToken } from "@/lib/renter-token";
@@ -562,5 +578,181 @@ describe("loadInbox", () => {
       user: null,
     });
     expect(await loadInbox()).toEqual({ inquiries: [], unread_total: 0 });
+  });
+});
+
+const now = new Date("2026-10-11T18:30:00.000Z");
+
+function signals(patch: Partial<SetupSignals> = {}): SetupSignals {
+  return {
+    title: "",
+    bedroomCount: 0,
+    bathrooms: null,
+    photoCount: 0,
+    description: "",
+    goodFor: [],
+    amenities: [],
+    monthlyRentCents: null,
+    availableFrom: null,
+    houseRules: null,
+    petPolicy: null,
+    petsAllowed: false,
+    smokingAllowed: false,
+    ...patch,
+  };
+}
+
+describe("owner dashboard progress", () => {
+  it("starts on basics", () => {
+    const progress = setupProgress(signals());
+    expect(progressCaption(progress)).toBe("Step 1 of 5 · Basics next");
+    expect(progress.percent).toBe(20);
+    expect(progress.setupStep).toBe("basics");
+  });
+
+  it("names photos as step 2 once the home facts are in", () => {
+    const progress = setupProgress(
+      signals({ title: "Charming Home on West Side", bedroomCount: 1, bathrooms: 1 }),
+    );
+    expect(progressCaption(progress)).toBe("Step 2 of 5 · Photos next");
+    expect(progress.percent).toBe(40);
+  });
+
+  it("fills the bar once every setup group has a value", () => {
+    const progress = setupProgress(
+      signals({
+        title: "Orchard",
+        bedroomCount: 1,
+        bathrooms: 1,
+        photoCount: 2,
+        description: "A quiet one-bedroom.",
+        goodFor: ["remote_workers"],
+        amenities: ["wifi"],
+        monthlyRentCents: 185_000,
+        availableFrom: "2026-11-01",
+        houseRules: "Quiet after 10.",
+      }),
+    );
+    expect(progress.complete).toBe(true);
+    expect(progress.percent).toBe(100);
+    expect(progressCaption(progress)).toBe("Ready to submit");
+    expect(progress.setupStep).toBe("review");
+  });
+});
+
+describe("owner dashboard listing cards", () => {
+  it("keeps a draft on city and type, and a live home on beds and rent", () => {
+    expect(
+      listingDetailLine({
+        status: "draft",
+        city: "Bend",
+        typeLabel: "ADU",
+        bedLabel: "1 bed",
+        rentLabel: null,
+      }),
+    ).toBe("Bend · ADU");
+    expect(
+      listingDetailLine({
+        status: "live",
+        city: "Bend",
+        typeLabel: "ADU",
+        bedLabel: "1 bed",
+        rentLabel: "$1,850/mo",
+      }),
+    ).toBe("Bend · 1 bed · $1,850/mo");
+  });
+
+  it("gives a draft continue setup and a live home edit plus confirm", () => {
+    const draft = listingActions({
+      id: "11111111-1111-4111-8111-111111111111",
+      status: "draft",
+      slug: null,
+      progress: setupProgress(signals({ title: "Home", bedroomCount: 1, bathrooms: 1 })),
+    });
+    expect(draft.actions.map((action) => action.label)).toEqual(["Continue setup"]);
+    expect(draft.cardHref).toContain("step=photos");
+    expect(draft.actions[0]?.tone).toBe("primary");
+
+    const live = listingActions({
+      id: "22222222-2222-4222-8222-222222222222",
+      status: "live",
+      slug: "orchard",
+      progress: setupProgress(signals({ title: "Home", bedroomCount: 1, bathrooms: 1, photoCount: 1, description: "Hi", goodFor: ["students"], amenities: ["wifi"], monthlyRentCents: 100, availableFrom: "2026-11-01", houseRules: "None" })),
+    });
+    expect(live.actions.map((action) => action.label)).toEqual(["Edit", "Confirm dates"]);
+    expect(live.actions.every((action) => action.tone === "secondary")).toBe(true);
+    expect(live.actions[1]?.href).toContain("/owner/calendar?listing=");
+  });
+
+  it("counts the filter tabs and writes the live caption", () => {
+    expect(
+      filterCounts([
+        { status: "draft" },
+        { status: "in_review" },
+        { status: "live" },
+        { status: "rejected" },
+      ]),
+    ).toEqual({ all: 4, drafts: 1, review: 1, live: 1 });
+    expect(matchesListingFilter("changes_requested", "review")).toBe(true);
+    const progress = setupProgress(signals());
+    expect(
+      listingStatusCaption({
+        status: "live",
+        progress,
+        submittedOn: null,
+        confirmedAgo: "3 days ago",
+        inquiryCount: 2,
+        adminNote: null,
+      }),
+    ).toBe("Calendar confirmed 3 days ago · 2 inquiries");
+    expect(
+      listingStatusCaption({
+        status: "in_review",
+        progress,
+        submittedOn: "Oct 10",
+        confirmedAgo: null,
+        inquiryCount: 0,
+        adminNote: null,
+      }),
+    ).toBe("Submitted Oct 10 · usually 1 business day");
+  });
+});
+
+describe("owner dashboard inbox", () => {
+  it("formats list time, stay dates, and a thread the composer can extend", () => {
+    expect(listTime("2026-10-11T16:30:00.000Z", now)).toBe("2h");
+    expect(agoLabel("2026-10-11T16:30:00.000Z", now)).toBe("2h ago");
+    expect(listTime("2026-10-10T18:30:00.000Z", now)).toBe("Yesterday");
+    expect(stayRange("2026-12-01", "2027-03-01")).toBe("Dec 1 – Mar 1");
+    expect(confirmedAgo("2026-10-08T18:30:00.000Z", now)).toBe("3 days ago");
+    expect(firstName("Jordan M.")).toBe("Jordan");
+    expect(initials("Jordan M.", "jordan@email.com")).toBe("JM");
+
+    const messages = threadMessages({
+      inquiryId: "inq",
+      body: "Is the washer in-unit?",
+      createdAt: "2026-10-11T16:30:00.000Z",
+      renterName: "Jordan M.",
+      ownerId: "owner",
+      now,
+      replies: [
+        {
+          id: "m1",
+          body: "Yes, it is in the unit.",
+          createdAt: "2026-10-11T17:30:00.000Z",
+          senderId: "owner",
+        },
+        {
+          id: "m2",
+          body: "Great! What's the next step?",
+          createdAt: "2026-10-11T18:18:00.000Z",
+          senderId: "renter",
+        },
+      ],
+    });
+    expect(messages.map((message) => message.from)).toEqual(["renter", "owner", "renter"]);
+    expect(messages[1]).toMatchObject({ name: "You", emailed: true });
+    expect(inquiryPreview(messages)).toBe("Great! What's the next step?");
+    expect(inquiryPreview(messages.slice(0, 2))).toBe("You: Yes, it is in the unit.");
   });
 });
