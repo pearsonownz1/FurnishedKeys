@@ -6,10 +6,12 @@ import { AssessmentForm } from "@/components/owners/assessment-form";
 import { sanitizeSource } from "@/lib/leads";
 import { ownersKicker, ownersRegionName } from "@/lib/owners-copy";
 import { FREE_TO_LIST, listMyPropertyLabel } from "@/lib/pricing";
+import { canonical } from "@/lib/site";
 
 export const metadata = {
   title: "List your property",
   description: FREE_TO_LIST,
+  ...canonical("/owners"),
 };
 
 type Search = Record<string, string | string[] | undefined>;

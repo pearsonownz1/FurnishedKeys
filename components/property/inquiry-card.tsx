@@ -42,7 +42,7 @@ export function InquiryCard({
 
   if (state.success) {
     return (
-      <aside className="rounded-[4px] border border-line bg-surface p-6 shadow-search">
+      <aside id="inquiry" className="scroll-mt-6 rounded-[4px] border border-line bg-surface p-6 shadow-search">
         <p className="text-lg font-semibold" role="status">
           Inquiry sent
         </p>
@@ -54,7 +54,7 @@ export function InquiryCard({
   }
 
   return (
-    <aside className="rounded-[4px] border border-line bg-surface p-6 shadow-search lg:sticky lg:top-6">
+    <aside id="inquiry" className="scroll-mt-6 rounded-[4px] border border-line bg-surface p-6 shadow-search lg:sticky lg:top-6">
       <p className="flex items-baseline gap-1.5">
         <span className="text-[28px] font-semibold">{rentLabel}</span>
         <span className="text-sm text-muted">/ month rent</span>

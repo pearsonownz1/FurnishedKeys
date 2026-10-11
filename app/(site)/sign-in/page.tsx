@@ -2,10 +2,12 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { SignInForm } from "@/components/auth/sign-in-form";
 import { requestedNext } from "@/lib/auth-redirect";
+import { canonical } from "@/lib/site";
 
 export const metadata = {
   title: "Sign in",
   description: "Sign in with your email and password.",
+  ...canonical("/sign-in"),
 };
 
 type Search = Record<string, string | string[] | undefined>;

@@ -19,7 +19,7 @@ const instrumentSerif = Instrument_Serif({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://furnishedkeys.com"),
+  metadataBase: new URL("https://www.furnishedkeys.com"),
   title: {
     default: brand.title,
     template: "%s | Furnished Keys",

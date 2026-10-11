@@ -70,6 +70,17 @@ export function monthCells(year: number, month: number): { iso: string; inMonth:
   return cells;
 }
 
+export type CalendarMonth = { year: number; month: number };
+
+export function shiftMonth(month: CalendarMonth, delta: number): CalendarMonth {
+  const date = new Date(Date.UTC(month.year, month.month + delta, 1));
+  return { year: date.getUTCFullYear(), month: date.getUTCMonth() };
+}
+
+export function monthIndex(month: CalendarMonth): number {
+  return month.year * 12 + month.month;
+}
+
 /** Two months starting at the current UTC month. */
 export function twoMonths(now = new Date()): { year: number; month: number }[] {
   const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));

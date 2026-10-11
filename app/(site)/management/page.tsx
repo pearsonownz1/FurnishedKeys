@@ -1,9 +1,10 @@
 import Link from "next/link";
+import { canonical } from "@/lib/site";
 
 export const metadata = {
   title: "Management",
-  description:
-    "Furnished Keys can handle renters and upkeep, from inquiries and showings to move-in. Book a consultation.",
+  description: "Ask us about full management. Pricing set in your free assessment.",
+  ...canonical("/management"),
 };
 
 export default function ManagementPage() {
@@ -14,8 +15,7 @@ export default function ManagementPage() {
         Furnished Keys management
       </h1>
       <p className="mt-5 max-w-xl text-[17px] leading-relaxed text-muted">
-        Hand off the work, from inquiries and showings to move-in. We handle
-        renters and upkeep. This page does not quote a management price.
+        Ask us about full management. Pricing set in your free assessment.
       </p>
       <p className="mt-8">
         <Link

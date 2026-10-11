@@ -1,6 +1,12 @@
 import { connection } from "next/server";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
+import { canonical } from "@/lib/site";
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  return canonical(`/owners/listings/${id}/plan`);
+}
 
 export default function PlanPage({ params }: { params: Promise<{ id: string }> }) {
   return (

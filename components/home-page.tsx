@@ -159,8 +159,8 @@ export function HomePage() {
               rented by the month.
             </h2>
             <p className="mt-4 max-w-[460px] text-[17px] leading-[1.55] text-[#c9d5cc]">
-              List it yourself and handle renters directly, or hand off the work
-              to us, from inquiries and showings to move-in.
+              List it yourself and handle renters directly, or ask us about full
+              management.
             </p>
             <div className="mt-8 grid max-w-[480px] gap-px border border-white/15 bg-white/15">
               <div className="flex items-center justify-between gap-4 bg-pine-d px-5 py-[18px]">
@@ -178,7 +178,7 @@ export function HomePage() {
                 <div>
                   <p className="font-semibold">Furnished Keys management</p>
                   <p className="mt-0.5 text-[13px] text-[#b9c9bd]">
-                    We handle renters and upkeep
+                    Pricing set in your free assessment
                   </p>
                 </div>
                 <Link href="/owners#assessment" className="text-sm text-[#c9d5cc]">

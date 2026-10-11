@@ -4,6 +4,12 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { loadListingEditor } from "@/lib/listing-editor-load";
 import { isListingStep } from "@/lib/listing-draft";
+import { canonical } from "@/lib/site";
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  return canonical(`/owners/listings/${id}`);
+}
 
 type Search = Record<string, string | string[] | undefined>;
 

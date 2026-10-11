@@ -2,6 +2,12 @@ import { connection } from "next/server";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { sanitizeSource } from "@/lib/leads";
+import { canonical } from "@/lib/site";
+
+export const metadata = {
+  title: "List your property",
+  ...canonical("/owners/start"),
+};
 
 type Search = Record<string, string | string[] | undefined>;
 

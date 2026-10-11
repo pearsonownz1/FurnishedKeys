@@ -1,6 +1,6 @@
 "use client";
 
-import { approximateCircle } from "@/lib/geo";
+import { approximateCircle, placePricePins } from "@/lib/geo";
 import {
   GeoJSONSource,
   LngLatBounds,
@@ -10,7 +10,7 @@ import {
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export type MapPoint = {
   id: string;
@@ -66,6 +66,7 @@ export function AreaMap({
   const activeRef = useRef(activeId);
   const onActiveRef = useRef(onActive);
   const router = useRouter();
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
 
   useEffect(() => {
     pointsRef.current = points;
@@ -148,21 +149,32 @@ export function AreaMap({
       markersRef.current = [];
 
       if (showPrices) {
-        for (const point of current) {
+        const placed = placePricePins(current, { expandedKey });
+        for (const pin of placed) {
+          const point = pin.items[0];
+          if (!point) continue;
           const button = document.createElement("button");
           button.type = "button";
-          button.dataset.id = point.id;
-          button.textContent = point.priceLabel;
-          button.className = markerClass(point.id === activeRef.current);
-          button.addEventListener("mouseenter", () => onActiveRef.current?.(point.id));
-          button.addEventListener("focus", () => onActiveRef.current?.(point.id));
-          if (navigate) {
-            button.addEventListener("click", () => {
-              router.push(`/rentals/${point.slug}`);
-            });
+          button.dataset.id = pin.clustered ? pin.key : point.id;
+          button.textContent = pin.clustered ? `${pin.items.length} homes` : point.priceLabel;
+          button.className = markerClass(!pin.clustered && point.id === activeRef.current);
+          if (!pin.clustered) {
+            button.addEventListener("mouseenter", () => onActiveRef.current?.(point.id));
+            button.addEventListener("focus", () => onActiveRef.current?.(point.id));
           }
-          const marker = new Marker({ element: button, anchor: "center" })
-            .setLngLat([point.lng, point.lat])
+          button.addEventListener("click", () => {
+            if (pin.clustered) {
+              setExpandedKey(pin.key);
+              return;
+            }
+            if (navigate) router.push(`/rentals/${point.slug}`);
+          });
+          const marker = new Marker({
+            element: button,
+            anchor: "center",
+            offset: [pin.offsetX, pin.offsetY],
+          })
+            .setLngLat([pin.lng, pin.lat])
             .addTo(map);
           markersRef.current.push(marker);
         }
@@ -188,7 +200,7 @@ export function AreaMap({
     return () => {
       cancelled = true;
     };
-  }, [pointKey, showPrices, navigate, router, center]);
+  }, [pointKey, showPrices, navigate, router, center, expandedKey]);
 
   useEffect(() => {
     const map = mapRef.current;

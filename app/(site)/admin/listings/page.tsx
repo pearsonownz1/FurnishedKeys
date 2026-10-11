@@ -4,10 +4,12 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { loadReviewQueue } from "@/lib/admin-queue";
 import { statusLabel } from "@/lib/owner-board";
+import { canonical } from "@/lib/site";
 
 export const metadata = {
   title: "Review queue",
   description: "Approve, request changes, or reject a listing.",
+  ...canonical("/admin/listings"),
 };
 
 export default function AdminQueuePage() {
