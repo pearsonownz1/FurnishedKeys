@@ -1,7 +1,12 @@
 "use server";
 
 import { loadRole, sessionUser } from "@/lib/api/owner-listing";
-import { performListingReview, type AdminState, type ReviewAction } from "@/lib/admin-review";
+import {
+  performListingReview,
+  setListingPublication,
+  type AdminState,
+  type ReviewAction,
+} from "@/lib/admin-review";
 import { ownerLeadStatuses, type OwnerLeadStatus } from "@/lib/db/types";
 import { publicOrigin } from "@/lib/email";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -55,6 +60,29 @@ async function review(
     return { ok: false, formError: result.error || LISTING_FAILED };
   }
   return { ok: true, success: true };
+}
+
+async function publication(listingId: string, published: boolean): Promise<AdminState> {
+  if (!uuidPattern.test(listingId)) return { ok: false, formError: "Listing not found" };
+  const gate = await adminWriter();
+  if (!gate.ok) return { ok: false, formError: ADMIN_ONLY };
+  const result = await setListingPublication({
+    supabase: gate.service,
+    listingId,
+    published,
+  });
+  if (!result.ok) return { ok: false, formError: result.error || LISTING_FAILED };
+  return { ok: true, success: true };
+}
+
+/** Takes an approved listing off the public catalog. Does not email the owner. */
+export async function unpublishListing(listingId: string): Promise<AdminState> {
+  return publication(listingId, false);
+}
+
+/** Puts an unpublished listing back on the public catalog. Does not email the owner. */
+export async function republishListing(listingId: string): Promise<AdminState> {
+  return publication(listingId, true);
 }
 
 /** Approves a listing when the submit checklist is complete, then emails the owner. */

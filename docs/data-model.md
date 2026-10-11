@@ -312,10 +312,14 @@ The review checklist is informational. Approve still uses the submit list (`titl
 | `approveListing` | `app/(site)/admin/actions.ts` | `(id)` | `{ ok, success?, formError? }`. Same approve rules, revalidation, and owner email as the review route. Incomplete: `{ ok: false, formError: "Listing is incomplete" }`. |
 | `requestChanges` | `app/(site)/admin/actions.ts` | `(prev, formData{listingId, note})` | `{ ok, success?, formError? }`. `note` is 1–4000 characters. Sets `changes_requested`, stores the note, revalidates public pages, and emails the owner when `notify_listing_status` is not false. Empty or oversized note: `{ ok: false, formError: "Write a note between 1 and 4000 characters." }`. |
 | `rejectListing` | `app/(site)/admin/actions.ts` | `(prev, formData{listingId, note?})` | `{ ok, success?, formError? }`. `note` is optional, at most 4000 characters. Sets `rejected`, revalidates, and emails the owner. |
+| `unpublishListing` | `app/(site)/admin/actions.ts` | `(listingId)` | `{ ok, success?, formError? }`. Moves an `approved` listing to `archived`. It drops off `/rentals`, `/sitemap.xml`, and `/rentals/<slug>` because those read `status = 'approved'`. New inquiries fail the existing `inquiries_insert` check (`private.listing_is_public`). Does not email. Revalidates `/rentals/<slug>`, `/rentals`, `/`, and `/sitemap.xml`. Any other status: `{ ok: false, formError: "Only a live listing can be unpublished." }`. |
+| `republishListing` | `app/(site)/admin/actions.ts` | `(listingId)` | `{ ok, success?, formError? }`. Moves that archived listing back to `approved` when `reviewed_at` is set, `rejection_reason` is null, and title, description, and rent are still present. Does not email. Same revalidation. Otherwise: `{ ok: false, formError: "Only an unpublished listing can go back live." }`. Incomplete: `{ ok: false, formError: "Listing is incomplete" }`. |
 | `updateLeadStatus` | `app/(site)/admin/actions.ts` | `(leadId, status)` | `{ ok, success?, formError? }`. `status` is `new`, `contacted`, `qualified`, `onboarded`, or `closed`. Unknown status: `{ ok: false, formError: "Pick a lead status." }`. Missing lead: `{ ok: false, formError: "That lead is not in the inbox." }`. |
 | `updateLeadNotes` | `app/(site)/admin/actions.ts` | `(leadId, notes)` | `{ ok, success?, formError? }`. Empty notes clear the column. Over 8000 characters: `{ ok: false, formError: "Keep notes under 8000 characters." }`. |
 
 `listings.submitted_at` is stamped when a listing moves to `pending_review`. Existing pending rows were backfilled from `updated_at`.
+
+`unpublishListing` uses the existing `archived` status. Public catalog, sitemap, and detail reads, plus inquiry inserts, already require `approved`, so no new status is needed.
 
 ## Deferred
 

@@ -1,5 +1,13 @@
+import { revalidatePath } from "next/cache";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { approveListing, requestChanges, updateLeadNotes, updateLeadStatus } from "@/app/(site)/admin/actions";
+import {
+  approveListing,
+  republishListing,
+  requestChanges,
+  unpublishListing,
+  updateLeadNotes,
+  updateLeadStatus,
+} from "@/app/(site)/admin/actions";
 import { loadAdminCounts } from "@/lib/admin-load";
 import { loadRole, loadOwnerListing, loadSetupState, sessionUser } from "@/lib/api/owner-listing";
 import { leadSourceLabel, reviewChecklist } from "@/lib/admin-review";
@@ -206,6 +214,68 @@ describe("requestChanges", () => {
       }),
     );
     expect(publicOrigin).toHaveBeenCalled();
+  });
+});
+
+describe("publication", () => {
+  function liveListing(status: "approved" | "archived" | "draft") {
+    const eq = vi.fn().mockResolvedValue({ error: null });
+    const update = vi.fn().mockReturnValue({ eq });
+    vi.mocked(createServiceClient).mockReturnValue({
+      from: () => ({ update }),
+    } as unknown as ReturnType<typeof createServiceClient>);
+    vi.mocked(sessionUser).mockResolvedValue({
+      supabase: {} as Awaited<ReturnType<typeof sessionUser>>["supabase"],
+      user: { id: adminId } as NonNullable<Awaited<ReturnType<typeof sessionUser>>["user"]>,
+    });
+    vi.mocked(loadRole).mockResolvedValue("admin");
+    vi.mocked(loadOwnerListing).mockResolvedValue({
+      id: listingId,
+      owner_id: adminId,
+      title: "Pine ADU",
+      description: "Furnished for a few months.",
+      monthly_rent_cents: 180000,
+      slug: "pine-adu",
+      status,
+      reviewed_at: status === "draft" ? null : "2026-10-01T00:00:00.000Z",
+      rejection_reason: null,
+      stripe_subscription_id: null,
+      renewal_canceled: false,
+    } as Awaited<ReturnType<typeof loadOwnerListing>>);
+    return { update };
+  }
+
+  it("archives a live listing without emailing the owner", async () => {
+    const { update } = liveListing("approved");
+    expect(await unpublishListing(listingId)).toEqual({ ok: true, success: true });
+    expect(update).toHaveBeenCalledWith({ status: "archived" });
+    expect(deliverReviewDecision).not.toHaveBeenCalled();
+    expect(revalidatePath).toHaveBeenCalledWith("/rentals/pine-adu");
+    expect(revalidatePath).toHaveBeenCalledWith("/rentals");
+    expect(revalidatePath).toHaveBeenCalledWith("/");
+    expect(revalidatePath).toHaveBeenCalledWith("/sitemap.xml");
+  });
+
+  it("refuses to unpublish a listing that is not live", async () => {
+    const { update } = liveListing("draft");
+    expect(await unpublishListing(listingId)).toEqual({
+      ok: false,
+      formError: "Only a live listing can be unpublished.",
+    });
+    expect(update).not.toHaveBeenCalled();
+    expect(deliverReviewDecision).not.toHaveBeenCalled();
+  });
+
+  it("republishes an archived live listing and stops a non-admin", async () => {
+    const { update } = liveListing("archived");
+    expect(await republishListing(listingId)).toEqual({ ok: true, success: true });
+    expect(update).toHaveBeenCalledWith({ status: "approved" });
+    expect(deliverReviewDecision).not.toHaveBeenCalled();
+
+    vi.mocked(loadRole).mockResolvedValue("owner");
+    expect(await republishListing(listingId)).toEqual({ ok: false, formError: "Admins only." });
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(await unpublishListing("not-an-id")).toEqual({ ok: false, formError: "Listing not found" });
   });
 });
 

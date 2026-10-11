@@ -192,6 +192,50 @@ export async function performListingReview(input: {
   return reread(input.supabase, input.listingId);
 }
 
+/**
+ * Unpublish sets `archived`. Republish sets `approved` only for a listing that
+ * was approved and then archived. Neither path emails the owner.
+ */
+export async function setListingPublication(input: {
+  supabase: AppClient;
+  listingId: string;
+  published: boolean;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  let listing: OwnerListing | null;
+  try {
+    listing = await loadOwnerListing(input.supabase, input.listingId);
+  } catch (error) {
+    const message = error instanceof Error && error.message ? error.message : "Could not load the listing";
+    return { ok: false, error: message };
+  }
+  if (!listing) return { ok: false, error: "Listing not found" };
+
+  if (input.published) {
+    const wasLive = listing.reviewed_at != null && listing.rejection_reason == null;
+    if (listing.status !== "archived" || !wasLive) {
+      return { ok: false, error: "Only an unpublished listing can go back live." };
+    }
+    if (
+      !listing.title?.trim() ||
+      !listing.description?.trim() ||
+      listing.monthly_rent_cents == null ||
+      listing.monthly_rent_cents <= 0
+    ) {
+      return { ok: false, error: "Listing is incomplete" };
+    }
+  } else if (listing.status !== "approved") {
+    return { ok: false, error: "Only a live listing can be unpublished." };
+  }
+
+  const updated = await input.supabase
+    .from("listings")
+    .update({ status: input.published ? "approved" : "archived" })
+    .eq("id", input.listingId);
+  if (updated.error) return { ok: false, error: updated.error.message };
+  revalidateListingPaths(listing.slug);
+  return { ok: true };
+}
+
 async function reread(supabase: AppClient, listingId: string): Promise<ReviewOutcome> {
   try {
     const listing = await loadOwnerListing(supabase, listingId);
