@@ -1,17 +1,32 @@
+import { cache } from "react";
 import { sessionUser } from "@/lib/api/owner-listing";
 import type { InquiryStatus, ListingStatus } from "@/lib/db/types";
 import { listingOwnerColumns } from "@/lib/db/types";
 import { isListingStep, type ListingStepId } from "@/lib/listing-draft";
-import { locationById } from "@/lib/locations";
+import { locationById, primaryLocation } from "@/lib/locations";
+import { fixtureDashboard } from "@/lib/owner-dashboard-fixtures";
 import {
   blockedDaysInMonth,
+  filterCounts,
+  firstName,
+  initials,
   listingPercent,
   listingStatusGroup,
   listingStepProgress,
+  listTime,
   messageSnippet,
+  monthDay,
+  occupantLabel,
+  petsLabel,
   resumeHref,
+  stayRange,
+  stepCaption,
+  type DashboardInquiry,
+  type DashboardListing,
+  type OwnerDashboardData,
   type OwnerListingCard,
 } from "@/lib/owner-dashboard";
+import { boardStatus } from "@/lib/owner-board";
 import { LISTING_PHOTOS_BUCKET, LISTING_PHOTO_TTL_SECONDS } from "@/lib/photos";
 
 export type InboxInquiry = {
@@ -329,5 +344,118 @@ export async function loadSettings(): Promise<SettingsProfile | null> {
     notify_new_inquiry: profile.data.notify_new_inquiry !== false,
     notify_new_message: profile.data.notify_new_message !== false,
     notify_listing_status: profile.data.notify_listing_status !== false,
+  };
+}
+
+function fixturesAllowed(): boolean {
+  return process.env.NODE_ENV !== "production";
+}
+
+function listingCaption(card: OwnerListingCard): string {
+  if (card.status_group === "draft") {
+    return stepCaption(card.step_index, card.step_count, card.next_step_label);
+  }
+  if (card.status === "pending_review") {
+    const when = monthDay(card.updated_at);
+    return when ? `Submitted ${when} · usually 1 business day` : "Submitted · usually 1 business day";
+  }
+  return "";
+}
+
+function toListing(card: OwnerListingCard): DashboardListing {
+  return {
+    id: card.id,
+    title: card.title?.trim() || "Untitled listing",
+    city: card.city ?? "",
+    status: boardStatus(card.status),
+    statusGroup: card.status_group,
+    typeLabel: "",
+    bedLabel: null,
+    rentLabel: null,
+    coverUrl: card.cover_url,
+    slug: null,
+    stepIndex: card.step_index,
+    stepCount: card.step_count,
+    nextStepLabel: card.next_step_label,
+    percentComplete: card.percent_complete,
+    resumeHref: card.resume_href,
+    caption: listingCaption(card),
+    inquiryCount: 0,
+    lastConfirmedAt: null,
+  };
+}
+
+function toInquiry(row: InboxInquiry, now: Date): DashboardInquiry {
+  const at = row.last_message_at;
+  return {
+    id: row.id,
+    listingId: "",
+    listingTitle: row.listing_title,
+    name: row.name,
+    firstName: firstName(row.name),
+    email: row.email,
+    phone: row.phone,
+    status: row.status,
+    createdAt: at ?? "",
+    listTime: at ? listTime(at, now) : "",
+    dateLabel: stayRange(row.move_in, row.move_out),
+    occupantLabel: occupantLabel(row.occupants),
+    petsLabel: petsLabel(row.pets),
+    preview: row.last_message_snippet,
+    unread: row.unread_count > 0,
+    messages: [],
+  };
+}
+
+export const loadOwnerDashboard = cache(async (): Promise<OwnerDashboardData> => {
+  const { user } = await sessionUser();
+  if (!user) {
+    if (fixturesAllowed()) return fixtureDashboard();
+    return emptyDashboard();
+  }
+
+  const [settings, cards, inbox] = await Promise.all([loadSettings(), loadOwnerListings(), loadInbox()]);
+  const now = new Date();
+  const name = settings?.full_name?.trim() || "";
+  const email = settings?.email?.trim() || user.email || "";
+  const listings = cards.map(toListing);
+  const inquiries = inbox.inquiries.map((row) => toInquiry(row, now));
+
+  return {
+    signedIn: true,
+    owner: {
+      name: name || email,
+      email,
+      phone: settings?.phone?.trim() || "",
+      initials: initials(name, email),
+      notifyNewInquiry: settings?.notify_new_inquiry ?? true,
+      notifyNewMessage: settings?.notify_new_message ?? true,
+      notifyListingStatus: settings?.notify_listing_status ?? true,
+    },
+    locationId: primaryLocation().id,
+    listings,
+    inquiries,
+    unread: inbox.unread_total,
+    counts: filterCounts(listings),
+  };
+});
+
+function emptyDashboard(): OwnerDashboardData {
+  return {
+    signedIn: false,
+    owner: {
+      name: "",
+      email: "",
+      phone: "",
+      initials: "",
+      notifyNewInquiry: true,
+      notifyNewMessage: true,
+      notifyListingStatus: true,
+    },
+    locationId: primaryLocation().id,
+    listings: [],
+    inquiries: [],
+    unread: 0,
+    counts: filterCounts([]),
   };
 }

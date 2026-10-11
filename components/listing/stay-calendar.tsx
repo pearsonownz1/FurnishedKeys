@@ -15,6 +15,17 @@ function monthFromDate(date: Date): CalendarMonth {
   return { year: date.getUTCFullYear(), month: date.getUTCMonth() };
 }
 
+function monthFromKey(value?: string): CalendarMonth | null {
+  if (!value || !/^\d{4}-\d{2}$/.test(value)) return null;
+  const [year, month] = value.split("-").map(Number);
+  if (!year || !month) return null;
+  return { year, month: month - 1 };
+}
+
+function monthKey(month: CalendarMonth): string {
+  return `${month.year}-${String(month.month + 1).padStart(2, "0")}`;
+}
+
 function monthFromIso(iso?: string): CalendarMonth | null {
   if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;
   const [year, month] = iso.split("-").map(Number);
@@ -27,16 +38,26 @@ export function StayCalendar({
   onToggle,
   marked,
   now,
+  month,
+  onMonthChange,
 }: {
   blocked: string[];
   onToggle?: (iso: string) => void;
   marked?: string;
   now?: Date;
+  /** `YYYY-MM`. Opens on this month when it is not before the current month. */
+  month?: string;
+  onMonthChange?: (month: string) => void;
 }) {
   const floor = monthFromDate(now ?? new Date());
+  const requested = monthFromKey(month);
   const markedMonth = monthFromIso(marked);
   const initial =
-    markedMonth && monthIndex(markedMonth) > monthIndex(floor) ? markedMonth : floor;
+    requested && monthIndex(requested) >= monthIndex(floor)
+      ? requested
+      : markedMonth && monthIndex(markedMonth) > monthIndex(floor)
+        ? markedMonth
+        : floor;
   const [cursor, setCursor] = useState(initial);
   const blockedSet = new Set(blocked);
   const atFloor = monthIndex(cursor) <= monthIndex(floor);
@@ -49,7 +70,13 @@ export function StayCalendar({
           aria-label="Previous month"
           disabled={atFloor}
           className="grid size-8 place-items-center rounded-[2px] border border-line text-lg leading-none disabled:opacity-40"
-          onClick={() => setCursor((month) => shiftMonth(month, -1))}
+          onClick={() =>
+            setCursor((current) => {
+              const next = shiftMonth(current, -1);
+              onMonthChange?.(monthKey(next));
+              return next;
+            })
+          }
         >
           <span aria-hidden="true">‹</span>
         </button>
@@ -58,7 +85,13 @@ export function StayCalendar({
           type="button"
           aria-label="Next month"
           className="grid size-8 place-items-center rounded-[2px] border border-line text-lg leading-none"
-          onClick={() => setCursor((month) => shiftMonth(month, 1))}
+          onClick={() =>
+            setCursor((current) => {
+              const next = shiftMonth(current, 1);
+              onMonthChange?.(monthKey(next));
+              return next;
+            })
+          }
         >
           <span aria-hidden="true">›</span>
         </button>
