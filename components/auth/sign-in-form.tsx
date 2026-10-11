@@ -1,6 +1,9 @@
 "use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
+import { useHydrated } from "@/components/auth/use-hydrated";
 import { safeNext } from "@/lib/auth-redirect";
 import { createClient } from "@/lib/supabase/client";
 
@@ -10,58 +13,51 @@ const fieldClass =
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function SignInForm({ next, notice }: { next: string; notice: string }) {
+  const router = useRouter();
+  const hydrated = useHydrated();
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [pending, setPending] = useState(false);
   const [fieldError, setFieldError] = useState<string | null>(null);
-  const [sent, setSent] = useState(false);
+  const destination = safeNext(next);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const address = email.trim();
-    if (!emailPattern.test(address)) {
-      setFieldError("Add a valid email.");
+    if (!emailPattern.test(address) || password.length < 8) {
+      setFieldError("Add your email and password.");
       return;
     }
     setPending(true);
     setFieldError(null);
-    const destination = safeNext(next);
     try {
       const supabase = createClient();
-      const { error } = await supabase.auth.signInWithOtp({
+      const { error } = await supabase.auth.signInWithPassword({
         email: address,
-        options: {
-          shouldCreateUser: false,
-          emailRedirectTo: `${window.location.origin}/auth/confirm?next=${encodeURIComponent(destination)}`,
-        },
+        password,
       });
-      if (error) console.error("sign-in", error.message);
+      if (error) {
+        console.error("sign-in", error.message);
+        setFieldError("Email or password is incorrect.");
+        setPending(false);
+        return;
+      }
     } catch (error) {
       console.error("sign-in", error);
+      setFieldError("Email or password is incorrect.");
+      setPending(false);
+      return;
     }
-    setPending(false);
-    setSent(true);
-  }
-
-  if (sent) {
-    return (
-      <div role="status">
-        <h1 className="font-serif text-[clamp(2.5rem,5vw,3.5rem)] leading-none font-normal tracking-[-0.8px]">
-          Check your email
-        </h1>
-        <p className="mt-5 max-w-xl text-[17px] leading-relaxed text-muted">
-          If an account exists for that address, a sign-in link is on its way.
-        </p>
-      </div>
-    );
+    router.push(destination);
   }
 
   return (
-    <form onSubmit={(event) => void submit(event)} noValidate className="max-w-md">
+    <form method="post" onSubmit={(event) => void submit(event)} noValidate className="max-w-md">
       <h1 className="font-serif text-[clamp(2.5rem,5vw,3.5rem)] leading-none font-normal tracking-[-0.8px]">
         Sign in
       </h1>
       <p className="mt-5 text-[17px] leading-relaxed text-muted">
-        We&apos;ll email you a link. No password.
+        Use the email and password from your listing.
       </p>
       {notice ? (
         <p className="mt-5 text-sm text-warn" role="alert">
@@ -79,6 +75,18 @@ export function SignInForm({ next, notice }: { next: string; notice: string }) {
           onChange={(event) => setEmail(event.target.value)}
         />
       </label>
+      <label className="mt-4 grid gap-1 text-sm">
+        Password
+        <input
+          className={fieldClass}
+          type="password"
+          name="password"
+          autoComplete="current-password"
+          minLength={8}
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+        />
+      </label>
       {fieldError ? (
         <p className="mt-3 text-sm text-warn" role="alert">
           {fieldError}
@@ -86,11 +94,16 @@ export function SignInForm({ next, notice }: { next: string; notice: string }) {
       ) : null}
       <button
         type="submit"
-        disabled={pending}
+        disabled={!hydrated || pending}
         className="mt-6 rounded-[2px] bg-pine px-5 py-3 text-sm font-semibold text-white disabled:opacity-70"
       >
-        Email me a link
+        Sign in
       </button>
+      <p className="mt-4 text-sm">
+        <Link href="/forgot-password" className="font-semibold text-pine">
+          Forgot password?
+        </Link>
+      </p>
     </form>
   );
 }

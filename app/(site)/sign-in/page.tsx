@@ -5,7 +5,7 @@ import { safeNext } from "@/lib/auth-redirect";
 
 export const metadata = {
   title: "Sign in",
-  description: "Email yourself a link to sign in.",
+  description: "Sign in with your email and password.",
 };
 
 type Search = Record<string, string | string[] | undefined>;
@@ -24,7 +24,7 @@ async function SignIn({ searchParams }: { searchParams: Promise<Search> }) {
   const raw = params.next;
   const next = safeNext(Array.isArray(raw) ? raw[0] : raw);
   const notice =
-    params.error === "link" ? "That sign-in link didn't work. Request a new one." : "";
+    params.error === "link" ? "That link didn't work. Request a new one from forgot password." : "";
 
   return (
     <div className="shell max-w-3xl py-14 lg:py-20">

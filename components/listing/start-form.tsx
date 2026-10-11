@@ -3,7 +3,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
+import { useHydrated } from "@/components/auth/use-hydrated";
 import type { PropertyType } from "@/lib/db/types";
 import { propertyTypeName } from "@/lib/property-display";
 
@@ -29,16 +30,24 @@ export function StartForm({
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const hydrated = useHydrated();
   const [error, setError] = useState<string | null>(null);
   const [needsSignIn, setNeedsSignIn] = useState(false);
   const [pending, setPending] = useState(false);
   const place = places.find((item) => item.id === locationId)?.label ?? "";
   const stepLabel = `${propertyTypeName(propertyType)} · ${place}`;
 
-  async function start() {
+  async function start(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
     if (!firstName.trim() || !lastName.trim() || !email.trim() || phone.trim().length < 7) {
       setError("Add your first name, last name, email, and phone.");
+      return;
+    }
+    if (password.length < 8) {
+      setError("Use a password of at least 8 characters.");
       return;
     }
     setPending(true);
@@ -51,6 +60,7 @@ export function StartForm({
         full_name: fullName,
         email: email.trim(),
         phone: phone.trim(),
+        password,
         property_type: propertyType,
         location_id: locationId,
         ...(source ? { source } : {}),
@@ -112,7 +122,7 @@ export function StartForm({
             </button>
           </div>
         ) : (
-          <div className="mt-8">
+          <form method="post" className="mt-8" onSubmit={(event) => void start(event)} noValidate>
             <h1 className="font-serif text-4xl leading-none font-normal">How can we reach you?</h1>
             <div className="mt-6 grid gap-4">
               <div className="grid gap-4 sm:grid-cols-2">
@@ -120,6 +130,7 @@ export function StartForm({
                   <span className={labelClass}>First name</span>
                   <input
                     className={fieldClass}
+                    name="first_name"
                     autoComplete="given-name"
                     placeholder="Jane"
                     value={firstName}
@@ -130,6 +141,7 @@ export function StartForm({
                   <span className={labelClass}>Last name</span>
                   <input
                     className={fieldClass}
+                    name="last_name"
                     autoComplete="family-name"
                     placeholder="Doe"
                     value={lastName}
@@ -139,25 +151,49 @@ export function StartForm({
               </div>
               <label className="grid gap-1">
                 <span className={labelClass}>Email</span>
-                <input
-                  className={fieldClass}
-                  type="email"
-                  autoComplete="email"
-                  placeholder="you@email.com"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                />
+                  <input
+                    className={fieldClass}
+                    type="email"
+                    name="email"
+                    autoComplete="email"
+                    placeholder="you@email.com"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                  />
               </label>
               <label className="grid gap-1">
                 <span className={labelClass}>Phone</span>
                 <input
                   className={fieldClass}
                   type="tel"
+                  name="phone"
                   autoComplete="tel"
                   placeholder="555-555-0100"
                   value={phone}
                   onChange={(event) => setPhone(event.target.value)}
                 />
+              </label>
+              <label className="grid gap-1">
+                <span className={labelClass}>Password</span>
+                <span className="flex gap-2">
+                  <input
+                    className={fieldClass}
+                    type={showPassword ? "text" : "password"}
+                    name="password"
+                    autoComplete="new-password"
+                    minLength={8}
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                  />
+                  <button
+                    type="button"
+                    aria-pressed={showPassword}
+                    className="shrink-0 rounded-[2px] border border-line px-3 text-sm"
+                    onClick={() => setShowPassword((current) => !current)}
+                  >
+                    {showPassword ? "Hide" : "Show"}
+                  </button>
+                </span>
               </label>
             </div>
             {error ? (
@@ -172,10 +208,9 @@ export function StartForm({
             ) : null}
             <div className="mt-8 flex gap-4">
               <button
-                type="button"
-                disabled={pending}
+                type="submit"
+                disabled={!hydrated || pending}
                 className="rounded-[2px] bg-pine px-5 py-3 text-sm font-semibold text-white disabled:opacity-70"
-                onClick={() => void start()}
               >
                 Continue
               </button>
@@ -183,7 +218,7 @@ export function StartForm({
                 Back
               </button>
             </div>
-          </div>
+          </form>
         )}
       </div>
       <div className="relative min-h-[280px] bg-stone md:min-h-full">
