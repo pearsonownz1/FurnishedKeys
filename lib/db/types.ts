@@ -1,6 +1,7 @@
 /**
  * Hand-written types for the FurnishedKeys schema.
- * Source of truth: supabase/migrations/20261011033000_init.sql.
+ * Source of truth: supabase/migrations/20261011033000_init.sql and
+ * supabase/migrations/20261011041000_owner_lead_interest.sql.
  *
  * `listings.address_private` is not selectable by anon or authenticated.
  * Use the `listings_public` view, or `listingPublicColumns`, for catalog reads.
@@ -59,6 +60,13 @@ export type FurnishedLevel = (typeof furnishedLevels)[number];
 
 export const ownerLeadStatuses = ["new", "contacted", "closed"] as const;
 export type OwnerLeadStatus = (typeof ownerLeadStatuses)[number];
+
+export const ownerLeadInterests = [
+  "list_myself",
+  "full_management",
+  "not_sure",
+] as const;
+export type OwnerLeadInterest = (typeof ownerLeadInterests)[number];
 
 export type Location = {
   id: string;
@@ -179,6 +187,7 @@ export type OwnerLead = {
   current_use: string | null;
   available_from: string | null;
   notes: string | null;
+  interest: OwnerLeadInterest | null;
   source: string;
   status: OwnerLeadStatus;
   assigned_to: string | null;
@@ -251,6 +260,7 @@ export type OwnerLeadInsert = WithOptional<
   | "current_use"
   | "available_from"
   | "notes"
+  | "interest"
   | "source"
   | "status"
   | "assigned_to"
@@ -366,6 +376,7 @@ export type Database = {
       inquiry_status: InquiryStatus;
       furnished_level: FurnishedLevel;
       owner_lead_status: OwnerLeadStatus;
+      owner_lead_interest: OwnerLeadInterest;
     };
     CompositeTypes: Record<string, never>;
   };
