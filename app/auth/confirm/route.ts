@@ -24,16 +24,17 @@ export async function GET(request: Request) {
   const code = url.searchParams.get("code");
   const supabase = await createClient();
 
-  // verifyOtp and exchangeCodeForSession both store the session cookie and
-  // confirm an existing unconfirmed account. shouldCreateUser stays false on
-  // the sign-in form, so this only completes users who already exist.
+  // Recovery links land here, then the owner chooses a password. Other token
+  // types still confirm an existing account and follow `next`.
+  const destination = type === "recovery" ? "/reset-password" : next;
   if (tokenHash && isOtpType(type)) {
     const verified = await supabase.auth.verifyOtp({ type, token_hash: tokenHash });
-    if (!verified.error) redirect(next);
+    if (!verified.error) redirect(destination);
   } else if (code) {
     const exchanged = await supabase.auth.exchangeCodeForSession(code);
-    if (!exchanged.error) redirect(next);
+    if (!exchanged.error) redirect(destination);
   }
 
+  if (type === "recovery") redirect("/forgot-password?error=link");
   redirect(`/sign-in?error=link&next=${encodeURIComponent(next)}`);
 }

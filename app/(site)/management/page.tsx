@@ -26,7 +26,7 @@ export default function ManagementPage() {
         </Link>
       </p>
       <p className="mt-6 text-[15px]">
-        <Link href="/list" className="font-semibold text-pine">
+        <Link href="/signup" className="font-semibold text-pine">
           Or list it yourself
         </Link>
       </p>

@@ -5,7 +5,7 @@ import { Suspense } from "react";
 import { ListingCard } from "@/components/listing-card";
 import { SearchBar, SearchBarSkeleton } from "@/components/search-bar";
 import { SiteFooter } from "@/components/site-footer";
-import { SiteHeader } from "@/components/site-header";
+import { AccountHeader } from "@/components/account-header";
 import { brand } from "@/lib/brand";
 import {
   getPublicListings,
@@ -14,7 +14,7 @@ import {
 } from "@/lib/listings";
 import { launchKicker, primaryLocation } from "@/lib/locations";
 import { signedPhotoUrls } from "@/lib/photos";
-import { listingFeeAmount } from "@/lib/pricing";
+import { FREE_TO_LIST } from "@/lib/pricing";
 
 const steps = [
   {
@@ -52,7 +52,9 @@ export function HomePage() {
             />
             <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(18,24,20,0.78)_0%,rgba(18,24,20,0.46)_46%,rgba(18,24,20,0.12)_100%)]" />
             <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(18,24,20,0.38)_0%,transparent_28%)]" />
-            <SiteHeader tone="overlay" />
+            <Suspense fallback={null}>
+              <AccountHeader tone="overlay" />
+            </Suspense>
             <div className="shell relative z-10 flex h-full flex-col justify-end pt-28 pb-24 lg:justify-start lg:pt-[168px] lg:pb-0">
               <p className="fk-rise text-xs tracking-[0.14em] uppercase">
                 {launchKicker(market)}
@@ -168,11 +170,8 @@ export function HomePage() {
                     Your listing, messages and calendar
                   </p>
                 </div>
-                <p className="font-serif text-[28px] leading-none">
-                  {listingFeeAmount()}
-                  <span className="ml-1 font-sans text-lg tracking-normal text-[#c9d5cc]">
-                    /year
-                  </span>
+                <p className="max-w-[14rem] text-right font-serif text-lg leading-snug">
+                  {FREE_TO_LIST}
                 </p>
               </div>
               <div className="flex items-center justify-between gap-4 bg-pine-d px-5 py-[18px]">

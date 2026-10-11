@@ -4,7 +4,7 @@ Marketplace for furnished monthly and extended-stay rentals — ADUs, apartments
 
 **Furnished homes. Flexible stays.** Find a furnished place for your next chapter—or let us help manage yours.
 
-Renters search and send an inquiry. Owners list a property for free, or ask for a management consultation. A commission on rented listings comes later. Listing submission lives under `app/api`. Booking is not built yet.
+Renters search and send an inquiry. Owners list a property or ask for a management consultation. Free to list. We only earn when you rent. Listing submission lives under `app/api`. Booking is not built yet.
 
 ## Stack
 
@@ -30,8 +30,7 @@ Copy `.env.example` for local work. Production values are set on the Vercel proj
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY` (server only)
-- `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, optional `STRIPE_LISTING_PRICE_ID` (without the secret key, checkout waives the fee for one year)
-- `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (Embedded Checkout)
+- `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, optional `STRIPE_LISTING_PRICE_ID` (server webhook routes only; the site does not start checkout)
 
 `lib/supabase/client.ts` is the browser client. `lib/supabase/server.ts` is the server client (cookie adapter, no session middleware yet).
 
@@ -56,4 +55,4 @@ Do not add files at those paths from the front end. Listing fixtures in `lib/lis
 
 ## Not in this version
 
-Inquiry threads and booking. The yearly listing fee is `POST /api/listings/[id]/checkout` (Embedded Checkout).
+Inquiry threads and booking. Stripe webhook routes remain for the server. The site does not call them.

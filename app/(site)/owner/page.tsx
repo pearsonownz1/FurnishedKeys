@@ -44,10 +44,6 @@ function DashboardBody({
   const banner = confirmationBanner(listings, new Date());
   return (
     <>
-      <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-muted">
-        Yearly renewal stays on until you turn it off. A listing with renewal off stays live through
-        the date already paid.
-      </p>
       {banner ? <p className="mt-6 max-w-3xl bg-pine-l px-4 py-3 text-sm text-pine-d">{banner}</p> : null}
       <div className="mt-8">
         <ListingBoard listings={listings} inquiries={inquiries} />

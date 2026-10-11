@@ -4,7 +4,6 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { loadListingEditor } from "@/lib/listing-editor-load";
 import { isListingStep } from "@/lib/listing-draft";
-import { feeCoversListing } from "@/lib/listings/access";
 
 type Search = Record<string, string | string[] | undefined>;
 
@@ -55,14 +54,6 @@ async function Editor({
 
   const raw = query.step;
   const step = Array.isArray(raw) ? raw[0] : raw;
-  const covered = feeCoversListing(
-    {
-      listing_fee_status: loaded.listing.feeStatus,
-      fee_paid_through: loaded.listing.paidThrough,
-    },
-    new Date(),
-  );
-  if (!covered) redirect(`/owners/listings/${id}/plan`);
   const suffix = isListingStep(step) ? `?step=${step}` : "";
   redirect(`/owners/listings/${id}/setup${suffix}`);
 }

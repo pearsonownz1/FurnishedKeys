@@ -2,8 +2,6 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { ListingSetup } from "@/components/listing/listing-setup";
-import { paidThroughMonthYear, parseCheckoutStatus } from "@/lib/checkout";
-import { GET as readCheckoutStatus } from "@/app/api/listings/[id]/checkout/status/route";
 import { loadListingEditor } from "@/lib/listing-editor-load";
 import { stepFromQuery } from "@/lib/listing-draft";
 
@@ -53,14 +51,6 @@ async function Setup({
     );
   }
 
-  const paidRaw = query.paid_through;
-  const paidThrough = Array.isArray(paidRaw) ? paidRaw[0] : paidRaw;
-  const sessionRaw = query.session_id;
-  const sessionId = Array.isArray(sessionRaw) ? sessionRaw[0] : sessionRaw;
-  const fromSession = sessionId ? await paidThroughForSession(id, sessionId) : null;
-  const iso = fromSession || paidThrough || loaded.listing.paidThrough;
-  const paidLabel =
-    iso && !Number.isNaN(new Date(iso).getTime()) ? paidThroughMonthYear(iso) : null;
   const stepRaw = query.step;
 
   return (
@@ -69,19 +59,6 @@ async function Setup({
       initial={loaded.listing.draft}
       initialStep={stepFromQuery(Array.isArray(stepRaw) ? stepRaw[0] : stepRaw)}
       placeLabel={loaded.listing.placeLabel}
-      paidThroughLabel={paidLabel}
     />
   );
-}
-
-async function paidThroughForSession(id: string, sessionId: string): Promise<string | null> {
-  const response = await readCheckoutStatus(
-    new Request(
-      `http://localhost/api/listings/${id}/checkout/status?session_id=${encodeURIComponent(sessionId)}`,
-    ),
-    { params: Promise.resolve({ id }) },
-  );
-  if (!response.ok) return null;
-  const parsed = parseCheckoutStatus(await response.json());
-  return parsed?.paid_through ?? null;
 }
