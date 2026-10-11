@@ -3,14 +3,16 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useHydrated } from "@/components/auth/use-hydrated";
+import { ResourcesNav } from "@/components/resources-nav";
 import type { UserRole } from "@/lib/db/types";
 
 const links = [
   { href: "/rentals", label: "Find a home" },
   { href: "/owners", label: "List your property" },
   { href: "/management", label: "Management" },
-  { href: "/sign-in", label: "Sign in" },
 ] as const;
+
+const signIn = { href: "/sign-in", label: "Sign in" } as const;
 
 function ownerFlow(pathname: string) {
   return (
@@ -53,7 +55,6 @@ export function SiteHeader({
   const menuClass = overlay
     ? "cursor-pointer rounded-[2px] border border-white/70 px-3 py-2 text-sm"
     : "cursor-pointer rounded-[2px] border border-line bg-surface px-3 py-2 text-sm";
-  const navLinks = signedIn ? links.filter((link) => link.href !== "/sign-in") : links;
   const accountHref = role === "admin" ? "/admin" : "/owner";
   const accountLabel = role === "admin" ? "Admin" : "My listings";
 
@@ -62,7 +63,7 @@ export function SiteHeader({
       className={
         overlay
           ? "absolute inset-x-0 top-0 z-20 text-white"
-          : "border-b border-line bg-surface text-ink"
+          : "relative z-20 border-b border-line bg-surface text-ink"
       }
     >
       <div
@@ -83,7 +84,7 @@ export function SiteHeader({
           aria-label="Primary"
           className={`hidden items-center gap-7 text-sm lg:flex ${overlay ? "" : "text-muted"}`}
         >
-          {navLinks.map((link) => {
+          {links.map((link) => {
             const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
             return (
               <Link
@@ -96,6 +97,12 @@ export function SiteHeader({
               </Link>
             );
           })}
+          <ResourcesNav key={pathname} variant="desktop" />
+          {signedIn ? null : (
+            <Link href={signIn.href} className="hover:opacity-80">
+              {signIn.label}
+            </Link>
+          )}
           {signedIn ? (
             <AccountLinks
               href={accountHref}
@@ -114,13 +121,13 @@ export function SiteHeader({
             <span className="sm:hidden">List</span>
             <span className="hidden sm:inline">List a property</span>
           </Link>
-          <details className="relative">
+          <details key={pathname} className="relative">
             <summary className={menuClass}>Menu</summary>
             <nav
               aria-label="Mobile"
-              className="absolute right-0 z-30 mt-2 w-56 border border-line bg-surface p-2 text-ink"
+              className="absolute right-0 z-30 mt-2 w-64 border border-line bg-surface p-2 text-ink"
             >
-              {navLinks.map((link) => {
+              {links.map((link) => {
                 const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
                 return (
                   <Link
@@ -137,6 +144,12 @@ export function SiteHeader({
                   </Link>
                 );
               })}
+              <ResourcesNav key={pathname} variant="mobile" />
+              {signedIn ? null : (
+                <Link href={signIn.href} className="block px-3 py-2.5 text-sm hover:bg-stone">
+                  {signIn.label}
+                </Link>
+              )}
               {signedIn ? (
                 <AccountLinks
                   href={accountHref}
