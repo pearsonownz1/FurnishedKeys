@@ -22,12 +22,6 @@ const selfPoints = [
   "Manage several listings from one owner dashboard",
 ] as const;
 
-const managedPoints = [
-  "Listing setup, inquiries and showings",
-  "Screening, leasing and move-ins",
-  "Tenant messages and maintenance coordination",
-] as const;
-
 const renterChips = [
   "Traveling professionals",
   "Relocating families",
@@ -143,14 +137,6 @@ async function OwnersLanding({ searchParams }: { searchParams: Promise<Search> }
             <p className="mt-6 text-[22px] leading-snug text-[#c9d5cc]">
               Pricing set in your free assessment
             </p>
-            <ul className="mt-8">
-              {managedPoints.map((point) => (
-                <li key={point} className="flex items-start gap-3 border-t border-white/15 py-3 text-[15px] leading-relaxed">
-                  <span aria-hidden="true" className="mt-[0.7em] h-px w-2.5 shrink-0 bg-[#c9d5cc]" />
-                  <span>{point}</span>
-                </li>
-              ))}
-            </ul>
             <a
               href="#assessment"
               className="mt-8 inline-block rounded-[2px] bg-white px-5 py-3.5 text-[15px] font-semibold text-pine-d"
