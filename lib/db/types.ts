@@ -265,6 +265,13 @@ export type Message = {
   created_at: string;
 };
 
+export type AuthMailAttempt = {
+  id: string;
+  bucket: "email" | "ip";
+  subject: string;
+  created_at: string;
+};
+
 export type OwnerLead = {
   id: string;
   name: string;
@@ -380,6 +387,7 @@ export type MessageInsert = WithOptional<
   Message,
   "id" | "sender_id" | "sender_role" | "emailed" | "created_at"
 >;
+export type AuthMailAttemptInsert = WithOptional<AuthMailAttempt, "id" | "created_at">;
 export type OwnerLeadInsert = WithOptional<
   OwnerLead,
   | "id"
@@ -507,6 +515,11 @@ export type Database = {
       >;
       inquiries: Table<Inquiry, InquiryInsert, InquiryUpdate>;
       messages: Table<Message, MessageInsert, MessageUpdate>;
+      auth_mail_attempts: Table<
+        AuthMailAttempt,
+        AuthMailAttemptInsert,
+        Partial<Omit<AuthMailAttempt, "id" | "created_at">>
+      >;
       owner_leads: Table<OwnerLead, OwnerLeadInsert, OwnerLeadUpdate>;
       listing_payments: Table<
         ListingPayment,
