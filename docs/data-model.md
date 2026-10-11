@@ -1,6 +1,6 @@
 # FurnishedKeys data model
 
-Postgres schema for the Supabase project. The migration is `supabase/migrations/20261011033000_init.sql`. Demo inventory is `supabase/seed.sql` (local `supabase db reset` only). Hand-written TypeScript for the front end is `lib/db/types.ts`.
+Postgres schema for the Supabase project. Migrations: `supabase/migrations/20261011033000_init.sql`, then `supabase/migrations/20261011041000_owner_lead_interest.sql`. Demo inventory is `supabase/seed.sql` (local `supabase db reset` only). Hand-written TypeScript for the front end is `lib/db/types.ts`.
 
 Markets are rows in `locations`. Policies and functions do not name a city. The launch rows match the front-end mirror in `lib/locations.ts`:
 
@@ -86,13 +86,14 @@ Thread replies. `sender_id` is null only so a later system note can exist. Signe
 
 Management consultation form.
 
-`id`, `name`, `email`, `phone`, `property_address`, `location_id`, `property_type`, `furnished`, `current_use`, `available_from`, `notes`, `source`, `status`, `assigned_to`, `created_at`.
+`id`, `name`, `email`, `phone`, `property_address`, `location_id`, `property_type`, `furnished`, `current_use`, `available_from`, `notes`, `interest`, `source`, `status`, `assigned_to`, `created_at`.
 
 - `furnished`: `yes | partly | no`
+- `interest`: `list_myself | full_management | not_sure`. Nullable, no default. Added by `20261011041000_owner_lead_interest.sql`.
 - `status`: `new | contacted | closed`, default `new`
-- `source`: short slug such as `web` (the default) or `mailer`
+- `source`: short slug, default `web`. The format check `^[a-z0-9_-]{1,40}$` accepts `web`, `mailer`, and `letter`. It is not a closed list.
 
-Anyone can insert a new, unassigned lead. They cannot read it back. `manager` and `admin` profiles can read and update the inbox. `assigned_to` must be a manager or admin.
+Anyone can insert a new, unassigned lead, including `interest` and `source`. The insert policy only requires `status = new` and `assigned_to` null, and the insert grant is table-level, so both columns are writable. Visitors cannot read the row back. `manager` and `admin` profiles can read and update the inbox. `assigned_to` must be a manager or admin.
 
 ## Address privacy
 
