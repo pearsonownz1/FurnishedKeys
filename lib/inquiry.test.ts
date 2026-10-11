@@ -47,6 +47,15 @@ describe("validateInquiry", () => {
       expect(result.fieldErrors.pets).toMatch(/does not allow pets/);
     }
   });
+
+  it("rejects a stay that overlaps a blocked day", () => {
+    const result = validateInquiry(base, {
+      ...constraints,
+      blockedDates: ["2026-11-15"],
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.fieldErrors.moveIn).toMatch(/blocked day/);
+  });
 });
 
 describe("toInquiryInsert", () => {

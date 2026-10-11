@@ -23,7 +23,9 @@ Public read of active rows. Admins read and write every row, including inactive 
 
 ### `profiles`
 
-`id`, `full_name`, `email`, `phone`, `role`, `company_name`, `created_at`.
+`id`, `full_name`, `email`, `phone`, `notify_email`, `role`, `company_name`, `created_at`.
+
+`notify_email` defaults to true. When it is false, inquiry notices and renter-message notices to that owner are skipped. Review decision mail still sends. `phone` was already on the profile.
 
 `role` is `renter | owner | manager | admin`, default `renter`. A trigger on `auth.users` inserts the profile at signup and always sets `renter`. Display name may be copied from signup metadata. Role is never taken from `user_metadata`.
 
@@ -33,7 +35,9 @@ Listing access is `listings.owner_id`, not `profiles.role`. A renter may draft a
 
 ### `listings`
 
-`id`, `owner_id`, `location_id`, `slug`, `title`, `description`, `property_type`, `bedrooms`, `bathrooms`, `max_occupants`, `pets_allowed`, `pet_policy`, `monthly_rent_cents`, `min_stay_months`, `max_stay_months`, `amenities`, `good_for`, `house_rules`, `square_feet`, `space_description`, `smoking_allowed`, `calendar_updated_at`, `approx_lat`, `approx_lng`, `address_private`, `management`, `status`, `is_demo`, `listing_fee_status`, `fee_paid_through`, `paid_at`, `admin_note`, `stripe_subscription_id`, `renewal_canceled`, `source`, `reviewed_by`, `reviewed_at`, `rejection_reason`, `created_at`, `updated_at`.
+`id`, `owner_id`, `location_id`, `slug`, `title`, `description`, `property_type`, `bedrooms`, `bathrooms`, `max_occupants`, `pets_allowed`, `pet_policy`, `monthly_rent_cents`, `min_stay_months`, `max_stay_months`, `amenities`, `good_for`, `house_rules`, `square_feet`, `space_description`, `smoking_allowed`, `calendar_updated_at`, `approx_lat`, `approx_lng`, `address_private`, `management`, `status`, `is_demo`, `listing_fee_status`, `fee_paid_through`, `paid_at`, `admin_note`, `stripe_subscription_id`, `renewal_canceled`, `source`, `setup_step`, `reviewed_by`, `reviewed_at`, `rejection_reason`, `created_at`, `updated_at`.
+
+`setup_step` is the wizard step last saved (`basics`, `rooms`, `photos`, `description`, `goodFor`, `amenities`, `rent`, `availability`, `rules`, `review`), or null. It is not on the public catalog. Authenticated clients can select it. The setup page opens `?step=` when that query is present, and otherwise opens the saved step. Every draft save writes the current step. Save and exit writes the fields entered so far, including the calendar, then leaves for `/owner`.
 
 Enums:
 
@@ -92,11 +96,15 @@ Rent stays on `listings.monthly_rent_cents`. Utilities, deposits, cleaning, pet,
 
 ### `inquiries`
 
-`id`, `listing_id`, `renter_id`, `name`, `email`, `phone`, `move_in`, `move_out`, `occupants`, `pets`, `message`, `status`, `assigned_to`, `created_at`.
+`id`, `listing_id`, `renter_id`, `name`, `email`, `phone`, `move_in`, `move_out`, `occupants`, `pets`, `message`, `status`, `assigned_to`, `renter_token_hash`, `last_message_at`, `owner_unread`, `renter_unread`, `created_at`.
 
 `renter_id` is null for a signed-out visitor. `status` is `new | responded | closed`, default `new`. `assigned_to` may point at a `manager` or `admin` profile.
 
-Anonymous and signed-in visitors can insert a row with `status = new`, `assigned_to` null, and `renter_id` null or their own id, and only when `private.listing_is_public(listing_id)` is true and the listing is not a demo (`private.listing_is_demo`). They cannot read it back unless they are signed in and `renter_id` is their id. The listing owner, the assignee, and admins can read the thread. Owners and assignees can update `status` and `assigned_to` only. Admins can edit the rest.
+Anonymous and signed-in visitors can insert a row with `status = new`, `assigned_to` null, and `renter_id` null or their own id, and only when `private.listing_is_public(listing_id)` is true and the listing is not a demo (`private.listing_is_demo`). They cannot read it back unless they are signed in and `renter_id` is their id. The listing owner, the assignee, and admins can read the thread. Owners and assignees can update `status`, `assigned_to`, `owner_unread`, `renter_unread`, and `last_message_at`. They cannot change `renter_token_hash`. Admins and the service role can edit the rest.
+
+`submitInquiry` stores `sha256` of a random 32-byte token in `renter_token_hash` and discards the raw token. The owner notice email is unchanged and does not include the link. A non-bypass insert forces `owner_unread = 1`, `renter_unread = 0`, and `last_message_at = now()`.
+
+Renter links rotate. Each successful `replyToInquiry` replaces `renter_token_hash` with the sha256 of a new token and puts the raw token only in that email's button (`/inquiry/<token>`). An older link no longer matches. The page then says "This link has expired. Open the newest email from the owner." The raw token is not stored. Encryption was not used, so a leaked old email cannot reopen the thread.
 
 `submitInquiry` refuses a demo listing before any insert or email: `{ ok: false, formError: "This is a sample listing, so it can't take inquiries. Browse real homes at /rentals." }`.
 
@@ -106,9 +114,11 @@ The owner board loads inquiries with `status` in `new` or `responded`. Each boar
 
 ### `messages`
 
-`id`, `inquiry_id`, `sender_id`, `body`, `created_at`.
+`id`, `inquiry_id`, `sender_id`, `sender_role`, `body`, `created_at`.
 
-Thread replies. `sender_id` is null only so a later system note can exist. Signed-in participants insert with `sender_id` equal to themselves. Participants do not update messages. Admins can delete.
+`sender_role` is `owner` or `renter`, default `owner`. `sender_id` stays nullable. Owner replies set `sender_id` to the signed-in profile and `sender_role` to `owner`. Renter replies set `sender_id` null and `sender_role` to `renter`, and only the service role inserts those after the token hash matches. `anon` has no privilege on `messages`. Signed-in users can insert only when `sender_role = owner`, `sender_id` is themselves, and `private.can_read_inquiry` is true. They can select messages on inquiries they can read. They cannot update messages. Admins can delete.
+
+A renter can send at most 20 messages on one inquiry per hour.
 
 ### Owner reply (`replyToInquiry`)
 
@@ -133,7 +143,7 @@ replyToInquiry(previousState, formData) => ReplyActionState
 | Message insert or status update fails | `{ ok: false, formError: "We couldn't send this. Please try again." }` |
 | Success | `{ ok: true, success: true }` |
 
-On success the action uses the signed-in user's client (RLS). It inserts `messages` `{ inquiry_id, sender_id, body }`, sets the inquiry `status` to `responded`, then emails the renter: `to` is `inquiries.email`, subject is `Re: your inquiry for <title>`, the body is HTML-escaped, and `replyTo` is the owner's `profiles.email`. A mail failure is logged and the action still returns success.
+On success the action uses the signed-in user's client (RLS). It inserts `messages` `{ inquiry_id, sender_id, sender_role: "owner", body }`, sets the inquiry `status` to `responded`, then the service role stores the new token hash, increments `renter_unread`, and sets `last_message_at`. The renter email subject stays `Re: your inquiry for <title>`. The HTML body is escaped and includes a button to `/inquiry/<token>`. `replyTo` is the owner's `profiles.email`. A mail failure is logged and the action still returns success. If the token cannot be stored, the action returns `{ ok: false, formError: "We couldn't send this. Please try again." }`.
 
 ### `owner_leads`
 
@@ -180,7 +190,7 @@ RLS is enabled and forced on every table above. `anon` is a signed-out Data API 
 | `listing_payments` | none | select rows for own listings | select all; writes are service role |
 | `listing_fees`, `listing_photos`, `listing_bedrooms`, `listing_blocked_dates`, `availability_windows` | select when the listing is publicly visible | same, plus full CRUD on children of own listings | all |
 | `inquiries` | insert only | insert; select own (`renter_id`), assigned, or owned-listing inquiries; update status/assignee on owned or assigned inquiries | all |
-| `messages` | none | select and insert on inquiries they can read | all, including delete |
+| `messages` | none | select on inquiries they can read; insert only an `owner` row as themselves | all, including delete |
 | `owner_leads` | insert only | insert; managers read/update the inbox; assignees read/update their rows | all |
 
 There is no public read of `profiles`, so owner phone and email are not on the catalog. Contact goes through an inquiry.
@@ -234,7 +244,7 @@ There are no refunds. Rejecting a listing sets `cancel_at_period_end` when Strip
 
 - `POST /api/owners/start` — `{ full_name, email, phone, password?, property_type, location_id, source? }`. Signed-in callers are reused (the email must match) and `password` is ignored. Anonymous callers must send `password` (8–72 characters). A missing or shorter password is 422 `{ error: "Password must be at least 8 characters" }`. Longer than 72 is 422 `{ error: "Password must be at most 72 characters" }`. The service client creates the user with `auth.admin.createUser` (`email_confirm: true`, that password, `user_metadata.full_name`), then `signInWithPassword` on the cookie client so the session cookie is set. The password is not returned. Email confirmation is on, so `signUp` is not used: it would leave an unconfirmed user with no session and later owner requests would run as anon. An email that already has an account gets 401 `{ error: "Sign in required", hint }` and the hint says to sign in or use Forgot password. If sign-in returns no session, the response is 500 `{ error: "Could not start the session" }`. The profile role becomes `owner` unless it is already `manager` or `admin`. A draft stub is inserted and the response is `{ listing_id }`. Owner listing routes check the session before selecting owner columns and return 401 `{ error: "Sign in required" }` when there is none. A database error from that select is JSON 500 `{ error }` instead of an uncaught throw.
 - `POST /api/listings` — signed-in draft. Promotes a renter to owner. 401 if signed out.
-- `PATCH /api/listings/[id]` — owner, and only `draft`, `rejected`, or `changes_requested`. Optional `availability` replaces windows. Also accepts `square_feet`, `space_description`, `smoking_allowed`, `amenities` (catalog keys), `good_for` (catalog keys), and `bedrooms: [{ label?, beds }]` which replaces every bedroom row. The integer `listings.bedrooms` is the row count after that write, not a field the client sets.
+- `PATCH /api/listings/[id]` — owner, and only `draft`, `rejected`, or `changes_requested`. Optional `availability` replaces windows. Also accepts `square_feet`, `space_description`, `smoking_allowed`, `amenities` (catalog keys), `good_for` (catalog keys), `setup_step` (a wizard step id), and `bedrooms: [{ label?, beds }]` which replaces every bedroom row. The integer `listings.bedrooms` is the row count after that write, not a field the client sets.
 - `GET /api/listings/[id]` — owner read, including `paid_at`, `admin_note`, and `renewal_canceled`.
 - `GET /api/listings/[id]/calendar` — owner read of `{ calendar_updated_at, availability, blocked_dates }`.
 - `PUT /api/listings/[id]/calendar` — owner, editable statuses only. Body `{ availability: [{ available_from, available_to? }], blocked_dates: [{ start_date, end_date, note? }] }` replaces both lists and returns the same shape as GET.
@@ -258,6 +268,26 @@ Front end Embedded Checkout needs `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`. The webh
 ```
 
 `first_name` is the first word of `profiles.full_name`. `last_initial` is the first letter of the last word, or null when the name is a single word. `member_since` is `profiles.created_at`. A listing that is not publicly visible returns `[]`. The function does not return email, phone, or any other profile field. `anon` and `authenticated` may call it.
+
+## Owner dashboard loaders and actions
+
+Front End builds the Listings, Inquiries, Calendar, and Settings screens. These are the server contracts. Signed-out loaders return `[]` or `null`. Actions return `{ ok, success?, formError?, fieldErrors?, message? }`.
+
+| Export | File | Args | Returns |
+| --- | --- | --- | --- |
+| `loadInbox` | `lib/owner-dashboard-load.ts` | none | `InboxInquiry[]` sorted by `last_message_at` desc. Each item: `id`, `name`, `email`, `phone`, `move_in`, `move_out`, `occupants`, `pets`, `status`, `listing_title`, `last_message_snippet`, `unread_count` (`owner_unread`), `last_message_at`. |
+| `loadThread` | `lib/owner-dashboard-load.ts` | `inquiryId: string` | `OwnerThread` or `null`. `inquiry` plus `messages: { id, sender_role, body, created_at }[]` oldest first. Sets `owner_unread` to 0 when the signed-in user can read the inquiry. |
+| `loadOwnerListings` | `lib/owner-dashboard-load.ts` | none | `OwnerListingCard[]`: `id`, `title`, `status`, `cover_url` (signed, or null), `city` (location name), `setup_step`, `percent_complete` (0–100 from the 8 submit fields), `resume_href` (`/owners/listings/<id>/setup?step=<setup_step>`), `updated_at`. |
+| `loadCalendar` | `lib/owner-dashboard-load.ts` | `listingId`, `month` `YYYY-MM` | `{ listing_id, month, blocked_days, availability: { id, available_from, available_to }[] }` or `null`. `blocked_days` are the expanded days in that month. Availability windows are the whole listing. |
+| `loadSettings` | `lib/owner-dashboard-load.ts` | none | `{ full_name, email, phone, notify_email }` or `null`. `email` is the auth user email when present. |
+| `replyToInquiry` | `app/(site)/owner/actions.ts` | `(prev, formData{inquiryId, body})` | Same `{ ok, success?, formError? }` as before. Rotates the renter token and emails `/inquiry/<token>`. |
+| `renterReply` | `app/(site)/inquiry/actions.ts` | `(prev, formData{token, body})` | `{ ok, success?, formError? }`. Body 1–8000. Bad token: "This link has expired. Open the newest email from the owner." Over 20 renter messages an hour: "Please wait before sending another message." Inserts `sender_role: "renter"`, increments `owner_unread`, sets `last_message_at`, and emails the owner "New message about <title>" with a button to `/owner/inquiries/<id>` when `notify_email` is not false. |
+| `setBlockedDates` | `app/(site)/owner/calendar-actions.ts` | `(listingId, days: string[], blocked: boolean)` | `{ ok, formError? }`. Adds or removes those `YYYY-MM-DD` days on `listing_blocked_dates` and keeps the other days. Another owner gets "That listing is not yours." |
+| `saveProfile` | `app/(site)/owner/settings-actions.ts` | `(prev, formData{full_name, phone, notify_email})` | `{ ok, success?, formError?, fieldErrors? }`. `notify_email` is true only for `true`, `on`, or `1`. |
+| `changeEmail` | `app/(site)/owner/settings-actions.ts` | `(prev, formData{email})` | `{ ok, success?, formError?, fieldErrors?, message? }`. Calls `supabase.auth.updateUser`. Success message: "Check your inbox to confirm the new email." A trigger copies the confirmed auth email onto `profiles.email`. |
+| `changePassword` | `app/(site)/owner/settings-actions.ts` | `(prev, formData{current_password, new_password})` | `{ ok, success?, formError?, fieldErrors? }`. `new_password` is 8–72 characters. `signInWithPassword` runs first, then `updateUser`. |
+
+`/inquiry/[token]` is the only new page. It shows the listing title, the original inquiry, then messages oldest first, and a reply box. The public property calendar already renders blocked days from `listing_blocked_dates`. An inquiry whose nights overlap a blocked day is rejected with "Those dates include a blocked day."
 
 ## Deferred
 

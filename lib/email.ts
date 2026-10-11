@@ -30,6 +30,14 @@ export type InquiryReply = {
   listingTitle: string;
   body: string;
   replyTo: string;
+  /** Absolute URL of /inquiry/<token>. The raw token is not stored. */
+  inquiryUrl: string;
+};
+
+export type RenterMessageNotice = {
+  ownerId: string;
+  listingTitle: string;
+  inquiryId: string;
 };
 
 /** Guy's address. Preview tests override this with LEADS_NOTIFY_TO. */
@@ -150,8 +158,18 @@ export function inquiryNoticeHtml(input: {
   );
 }
 
-export function inquiryReplyHtml(body: string): string {
-  return layout(`<p style="margin:0;">${escapeHtml(body).replaceAll("\n", "<br>")}</p>`);
+export function inquiryReplyHtml(body: string, inquiryUrl: string): string {
+  return layout(
+    `<p style="margin:0;">${escapeHtml(body).replaceAll("\n", "<br>")}</p>` +
+      `<p style="margin:24px 0 0;"><a href="${escapeHtml(inquiryUrl)}">Reply to this message</a></p>`,
+  );
+}
+
+export function renterMessageNoticeHtml(input: { listingTitle: string; threadUrl: string }): string {
+  return layout(
+    `<p style="margin:0 0 16px;">New message about <strong>${escapeHtml(input.listingTitle)}</strong>.</p>` +
+      `<p style="margin:24px 0 0;"><a href="${escapeHtml(input.threadUrl)}">View the message</a></p>`,
+  );
 }
 
 export function ownerLeadNoticeHtml(lead: OwnerLeadNotice): string {
@@ -199,8 +217,9 @@ export function reviewNoticeHtml(input: {
 /** Looks up the owner and sends the inquiry notice. A failure is logged and swallowed. */
 export async function deliverInquiryNotice(notice: InquiryNotice): Promise<SendResult> {
   try {
-    const owner = await ownerEmail(notice.ownerId);
+    const owner = await ownerContact(notice.ownerId);
     if (!owner.email) return { id: null, detail: owner.detail };
+    if (!owner.notify) return { id: null, detail: "skipped:notify-email" };
     const origin = await siteOrigin();
     const inquiryUrl = `${origin}/owner#inquiry-${notice.inquiryId}`;
     return await sendEmail({
@@ -216,18 +235,38 @@ export async function deliverInquiryNotice(notice: InquiryNotice): Promise<SendR
   }
 }
 
-/** Emails the renter the owner's reply. A failure is logged and swallowed. */
+/** Emails the renter the owner's reply, including a fresh thread link. A failure is logged and swallowed. */
 export async function deliverInquiryReply(reply: InquiryReply): Promise<SendResult> {
   try {
     return await sendEmail({
       to: reply.to,
       subject: `Re: your inquiry for ${oneLine(reply.listingTitle)}`,
-      html: inquiryReplyHtml(reply.body),
+      html: inquiryReplyHtml(reply.body, reply.inquiryUrl),
       replyTo: reply.replyTo,
     });
   } catch (error) {
     const reason = error instanceof Error ? error.message : "error";
     console.error("inquiry reply email failed", reason);
+    return { id: null, detail: `failed:${reason}`.slice(0, 180) };
+  }
+}
+
+/** Emails the owner that the renter wrote back. Skipped when notify_email is false. */
+export async function deliverRenterMessageNotice(notice: RenterMessageNotice): Promise<SendResult> {
+  try {
+    const owner = await ownerContact(notice.ownerId);
+    if (!owner.email) return { id: null, detail: owner.detail };
+    if (!owner.notify) return { id: null, detail: "skipped:notify-email" };
+    const origin = await siteOrigin();
+    const threadUrl = `${origin}/owner/inquiries/${notice.inquiryId}`;
+    return await sendEmail({
+      to: owner.email,
+      subject: `New message about ${oneLine(notice.listingTitle)}`,
+      html: renterMessageNoticeHtml({ listingTitle: notice.listingTitle, threadUrl }),
+    });
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : "error";
+    console.error("renter message email failed", reason);
     return { id: null, detail: `failed:${reason}`.slice(0, 180) };
   }
 }
@@ -254,7 +293,7 @@ export async function deliverOwnerLeadNotice(lead: OwnerLeadNotice): Promise<Sen
 /** Looks up the owner and sends the review decision. A failure is logged and swallowed. */
 export async function deliverReviewDecision(notice: ReviewNotice): Promise<void> {
   try {
-    const owner = await ownerEmail(notice.ownerId);
+    const owner = await ownerContact(notice.ownerId);
     if (!owner.email) return;
     const title = oneLine(notice.listingTitle);
     const subject =
@@ -279,26 +318,32 @@ export async function deliverReviewDecision(notice: ReviewNotice): Promise<void>
   }
 }
 
-async function ownerEmail(ownerId: string): Promise<{ email: string | null; detail: string }> {
+async function ownerContact(
+  ownerId: string,
+): Promise<{ email: string | null; notify: boolean; detail: string }> {
   const service = createServiceClient();
   if (!service) {
     console.error("email skipped: service client is not configured");
-    return { email: null, detail: "skipped:no-service-client" };
+    return { email: null, notify: false, detail: "skipped:no-service-client" };
   }
   const { data, error } = await service
     .from("profiles")
-    .select("email")
+    .select("email, notify_email")
     .eq("id", ownerId)
     .maybeSingle();
   if (error) {
     console.error("email skipped: owner lookup failed", error.message);
-    return { email: null, detail: `skipped:lookup:${error.message}`.slice(0, 180) };
+    return { email: null, notify: false, detail: `skipped:lookup:${error.message}`.slice(0, 180) };
   }
   if (!data?.email) {
     console.error("email skipped: owner has no email");
-    return { email: null, detail: "skipped:no-owner-email" };
+    return { email: null, notify: false, detail: "skipped:no-owner-email" };
   }
-  return { email: data.email, detail: "ok" };
+  return { email: data.email, notify: data.notify_email !== false, detail: "ok" };
+}
+
+export async function publicOrigin(): Promise<string> {
+  return siteOrigin();
 }
 
 async function siteOrigin(): Promise<string> {

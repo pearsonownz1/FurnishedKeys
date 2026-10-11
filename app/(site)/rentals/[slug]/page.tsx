@@ -280,6 +280,7 @@ async function ListingBody({
             maxOccupants: listing.max_occupants,
             petsAllowed: listing.pets_allowed,
             availability: listing.availability_windows,
+            blockedDates: blocked,
           }}
         />
       </div>

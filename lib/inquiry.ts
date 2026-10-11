@@ -1,4 +1,5 @@
 import type { AvailabilityWindow, InquiryInsert } from "@/lib/db/types";
+import { stayHitsBlocked } from "@/lib/owner-dashboard";
 import { stayMonthsBetween } from "@/lib/search";
 
 export type InquiryInput = {
@@ -40,6 +41,7 @@ export function validateInquiry(
     maxOccupants: number;
     petsAllowed: boolean;
     availability: AvailabilityWindow[];
+    blockedDates?: string[];
   },
 ): InquiryResult {
   const fieldErrors: Partial<Record<InquiryField, string>> = {};
@@ -75,6 +77,13 @@ export function validateInquiry(
     })
   ) {
     fieldErrors.moveIn = "Those dates are outside the confirmed window.";
+  }
+  if (
+    !fieldErrors.moveIn &&
+    !fieldErrors.moveOut &&
+    stayHitsBlocked(input.moveIn, input.moveOut, constraints.blockedDates ?? [])
+  ) {
+    fieldErrors.moveIn = "Those dates include a blocked day.";
   }
 
   if (!Number.isInteger(input.occupants) || input.occupants < 1) {

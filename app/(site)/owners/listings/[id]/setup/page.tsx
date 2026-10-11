@@ -58,12 +58,16 @@ async function Setup({
   }
 
   const stepRaw = query.step;
+  const fromQuery = Array.isArray(stepRaw) ? stepRaw[0] : stepRaw;
+  const initialStep = fromQuery
+    ? stepFromQuery(fromQuery)
+    : stepFromQuery(loaded.listing.setupStep ?? undefined);
 
   return (
     <ListingSetup
       listingId={id}
       initial={loaded.listing.draft}
-      initialStep={stepFromQuery(Array.isArray(stepRaw) ? stepRaw[0] : stepRaw)}
+      initialStep={initialStep}
       placeLabel={loaded.listing.placeLabel}
     />
   );
