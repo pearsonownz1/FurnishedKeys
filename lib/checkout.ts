@@ -26,6 +26,13 @@ export function parseCheckoutPost(value: unknown): CheckoutPostResponse | null {
   return null;
 }
 
+/** 503, or an error that says payments are not configured. */
+export function checkoutNotConfigured(status: number, body: unknown): boolean {
+  if (status === 503) return true;
+  if (!isRecord(body) || typeof body.error !== "string") return false;
+  return /not configured|not set up/i.test(body.error);
+}
+
 export function parseCheckoutStatus(value: unknown): CheckoutStatusResponse | null {
   if (!isRecord(value) || typeof value.status !== "string" || value.status.length === 0) {
     return null;

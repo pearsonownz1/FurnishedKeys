@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { StripeEmbed } from "@/components/listing/stripe-embed";
-import { parseCheckoutPost } from "@/lib/checkout";
+import { checkoutNotConfigured, parseCheckoutPost } from "@/lib/checkout";
 import { listingFeeAmount, listingFeePerYear } from "@/lib/pricing";
 
 const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? "";
@@ -20,9 +20,13 @@ export function CheckoutPanel({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
-  const [paymentsPendingSetup, setPaymentsPendingSetup] = useState(false);
+  const [paymentsPendingSetup, setPaymentsPendingSetup] = useState(!publishableKey);
 
   async function pay(renew: boolean) {
+    if (!publishableKey) {
+      setPaymentsPendingSetup(true);
+      return;
+    }
     setPending(true);
     setError(null);
     setPaymentsPendingSetup(false);
@@ -33,6 +37,11 @@ export function CheckoutPanel({
       body: JSON.stringify({ auto_renew: renew }),
     });
     const body: unknown = await response.json().catch(() => null);
+    if (checkoutNotConfigured(response.status, body)) {
+      setPaymentsPendingSetup(true);
+      setPending(false);
+      return;
+    }
     const parsed = parseCheckoutPost(body);
     if (!response.ok || !parsed) {
       setError("We couldn't start checkout. Please try again.");
@@ -40,11 +49,6 @@ export function CheckoutPanel({
       return;
     }
     if ("client_secret" in parsed) {
-      if (!publishableKey) {
-        setPaymentsPendingSetup(true);
-        setPending(false);
-        return;
-      }
       setClientSecret(parsed.client_secret);
       setPending(false);
       return;
@@ -78,12 +82,12 @@ export function CheckoutPanel({
           />
           <span>Renew automatically each year. You can turn this off later.</span>
         </label>
-        {clientSecret && publishableKey ? (
+        {paymentsPendingSetup ? (
+          <p className="mt-6 text-sm text-muted">Payments are being set up</p>
+        ) : clientSecret ? (
           <div className="mt-6">
             <StripeEmbed clientSecret={clientSecret} publishableKey={publishableKey} />
           </div>
-        ) : paymentsPendingSetup ? (
-          <p className="mt-6 text-sm text-muted">Payments are being set up</p>
         ) : (
           <button
             type="button"

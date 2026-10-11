@@ -117,7 +117,8 @@ async function readCatalog(): Promise<PublicListing[]> {
   const { data: rows, error } = await supabase
     .from("listings")
     .select(listingPublicColumns.join(","))
-    .eq("status", "approved");
+    .eq("status", "approved")
+    .in("listing_fee_status", ["paid", "waived"]);
 
   if (error) {
     throw new Error("Could not load listings");

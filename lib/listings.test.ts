@@ -86,6 +86,8 @@ describe("listing catalog", () => {
     expect(source).toContain('from("listing_blocked_dates")');
     expect(source).toContain("public_listing_landlord");
     expect(source).toContain("listingPublicColumns.join");
+    expect(source).toContain('.in("listing_fee_status", ["paid", "waived"])');
+    expect(source).not.toMatch(/\.eq\(\s*"is_demo"/);
     expect(source).not.toMatch(/select\([^)]*address_private/);
     expect(source).not.toContain("listing_address");
     expect(catalogAllowsFixtures("production")).toBe(false);

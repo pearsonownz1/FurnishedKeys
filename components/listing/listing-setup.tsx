@@ -236,7 +236,7 @@ export function ListingSetup({
       return;
     }
     if (response.status === 402) {
-      setError("The yearly fee is still open.");
+      setError("Payment needed");
       return;
     }
     setError(body?.error ?? "We couldn't submit this listing. Please try again.");
@@ -300,7 +300,7 @@ export function ListingSetup({
           {error ? (
             <p className="mb-4 text-sm text-warn" role="alert">
               {error}
-              {error === "The yearly fee is still open." ? (
+              {error === "Payment needed" ? (
                 <>
                   {" "}
                   <a className="font-semibold text-pine" href={`/owners/listings/${listingId}/checkout`}>

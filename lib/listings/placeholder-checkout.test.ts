@@ -194,11 +194,8 @@ describe("POST /api/listings/[id]/checkout", () => {
     expect(create).toHaveBeenCalledOnce();
     expect(create.mock.calls[0][0].ui_mode).toBe("embedded_page");
     expect(create.mock.calls[0][0].mode).toBe("subscription");
-    expect(create.mock.calls[0][0].branding_settings).toEqual({
-      button_color: "#2e4a3b",
-      font_family: "inter",
-      border_style: "rectangular",
-    });
+    expect(create.mock.calls[0][0]).not.toHaveProperty("branding_settings");
+    expect(create.mock.calls[0][0]).not.toHaveProperty("appearance");
     expect(createServiceClient).not.toHaveBeenCalled();
   });
 });
