@@ -68,9 +68,10 @@ describe("owner lead insert", () => {
       new URL("../app/(site)/owners/actions.ts", import.meta.url),
       "utf8",
     );
-    expect(action).toContain("owner_leads");
-    expect(action).not.toContain(".insert(");
-    expect(action).not.toContain("createClient");
+    expect(action).toContain('.from("owner_leads").insert(');
+    expect(action).toContain("logInsertError");
+    expect(action).not.toMatch(/\.insert\([\s\S]*?\)\s*\.select\(/);
+    expect(action).not.toMatch(/\.single\(/);
     expect(listMyPropertyLabel()).toBe("List my property — $199");
   });
 

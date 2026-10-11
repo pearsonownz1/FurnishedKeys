@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { PublicListing } from "./listings";
 import {
+  catalogAllowsFixtures,
   confirmationLabel,
   costTableFees,
   filterListings,
@@ -68,11 +69,18 @@ function listing(partial: Partial<PublicListing> & Pick<PublicListing, "slug">):
 }
 
 describe("listing catalog", () => {
-  it("reads the public view instead of local fixtures", () => {
+  it("reads public listing columns and keeps fixtures off production", () => {
     const source = readFileSync(new URL("./listings.ts", import.meta.url), "utf8");
-    expect(source).toContain('from("listings_public")');
-    expect(source).not.toContain("demoListings");
+    expect(source).toContain('from("listings")');
+    expect(source).toContain('from("listing_fees")');
+    expect(source).toContain('from("listing_photos")');
+    expect(source).toContain('from("availability_windows")');
+    expect(source).toContain("listingPublicColumns.join");
     expect(source).not.toMatch(/select\([^)]*address_private/);
+    expect(source).not.toContain("listing_address");
+    expect(catalogAllowsFixtures("production")).toBe(false);
+    expect(catalogAllowsFixtures("preview")).toBe(true);
+    expect(catalogAllowsFixtures(undefined)).toBe(true);
   });
 
   it("keeps rent separate from each fee and confirms availability from last_confirmed_at", () => {

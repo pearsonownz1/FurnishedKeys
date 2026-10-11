@@ -1,23 +1,33 @@
 import { cache } from "react";
-import type {
-  AvailabilityWindow,
-  FeeKind,
-  ListingFee,
-  ListingManagement,
-  ListingPhoto,
-  ListingPublic,
-  Location,
-  PropertyType,
+import {
+  listingPublicColumns,
+  type AvailabilityWindow,
+  type FeeKind,
+  type ListingFee,
+  type ListingManagement,
+  type ListingPhoto,
+  type ListingPublic,
+  type Location,
+  type PropertyType,
 } from "@/lib/db/types";
+import { fixtureListings } from "@/lib/listing-fixtures";
 import { formatCents } from "@/lib/money";
 import type { ListingQuery } from "@/lib/search";
 import { createPublicClient } from "@/lib/supabase/public";
 
 /**
- * Catalog reads from the live tables (`listings_public`, `listing_fees`,
- * `listing_photos`, `availability_windows`, `locations`).
- * Public reads never include `address_private`.
+ * Catalog reads from `listings`, `listing_fees`, `listing_photos`,
+ * `availability_windows`, and `locations`.
+ * The select list is `listingPublicColumns`, so a public page never asks
+ * for the private street address.
  */
+
+/** Production uses the database only. Preview and local builds may use fixtures. */
+export function catalogAllowsFixtures(
+  vercelEnv: string | undefined = process.env.VERCEL_ENV,
+): boolean {
+  return vercelEnv !== "production";
+}
 
 type CatalogText = "title" | "slug";
 type CatalogNumber =
@@ -88,18 +98,20 @@ function groupByListing<T extends { listing_id: string }>(rows: T[]): Map<string
   return grouped;
 }
 
-async function loadPublicListings(): Promise<PublicListing[]> {
+async function readCatalog(): Promise<PublicListing[]> {
   const supabase = createPublicClient();
   const { data: rows, error } = await supabase
-    .from("listings_public")
-    .select("*")
+    .from("listings")
+    .select(listingPublicColumns.join(","))
     .eq("status", "approved");
 
   if (error) {
     throw new Error("Could not load listings");
   }
 
-  const listings = (rows ?? []).map((row) => normalizeListing(row));
+  const listings = ((rows ?? []) as unknown as ListingPublic[]).map((row) =>
+    normalizeListing(row),
+  );
   if (listings.length === 0) return [];
 
   const ids = listings.map((listing) => listing.id);
@@ -136,6 +148,18 @@ async function loadPublicListings(): Promise<PublicListing[]> {
       },
     ];
   });
+}
+
+async function loadPublicListings(): Promise<PublicListing[]> {
+  try {
+    const listings = await readCatalog();
+    if (listings.length === 0 && catalogAllowsFixtures()) return fixtureListings();
+    return listings;
+  } catch (error) {
+    if (!catalogAllowsFixtures()) throw error;
+    console.error("catalog read failed; using local fixtures", error);
+    return fixtureListings();
+  }
 }
 
 export const getPublicListings = cache(loadPublicListings);

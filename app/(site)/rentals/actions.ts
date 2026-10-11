@@ -4,8 +4,7 @@ import type { InquiryActionState } from "@/lib/inquiry";
 import { readInquiryForm, toInquiryInsert, validateInquiry } from "@/lib/inquiry";
 import { getPublicListings } from "@/lib/listings";
 import { createPublicClient } from "@/lib/supabase/public";
-
-const initialFailure = "We couldn't send that inquiry. Please try again.";
+import { logInsertError } from "@/lib/writes";
 
 export async function submitInquiry(
   _previous: InquiryActionState,
@@ -32,7 +31,7 @@ export async function submitInquiry(
   const supabase = createPublicClient();
   const { error } = await supabase.from("inquiries").insert(toInquiryInsert(input));
   if (error) {
-    return { ok: false, formError: initialFailure };
+    return { ok: false, formError: logInsertError("inquiries", error) };
   }
 
   return { ok: true, success: true };
