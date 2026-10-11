@@ -8,6 +8,7 @@ import {
   DEFAULT_LEADS_NOTIFY_TO,
   deliverInquiryNotice,
   deliverInquiryReply,
+  deliverRenterMessageNotice,
   deliverOwnerLeadNotice,
   deliverReviewDecision,
   inquiryNoticeHtml,
@@ -279,6 +280,35 @@ describe("deliverInquiryNotice", () => {
     expect(error).toHaveBeenCalledWith("email skipped: service client is not configured");
     error.mockRestore();
   });
+
+  it("skips the owner when notify_email is false", async () => {
+    const maybeSingle = vi.fn().mockResolvedValue({
+      data: { email: "owner@example.com", notify_email: false },
+      error: null,
+    });
+    vi.mocked(createServiceClient).mockReturnValue({
+      from: () => ({ select: () => ({ eq: () => ({ maybeSingle }) }) }),
+    } as unknown as ReturnType<typeof createServiceClient>);
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await deliverInquiryNotice({
+      ownerId,
+      listingTitle: "Pine ADU",
+      inquiryId,
+      renterName: "Ada",
+      renterEmail: "ada@example.com",
+      renterPhone: null,
+      moveIn: "2026-11-01",
+      moveOut: "2027-02-01",
+      occupants: 1,
+      pets: null,
+      message: "Hello",
+    });
+
+    expect(result).toEqual({ id: null, detail: "skipped:notify-email" });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });
 
 describe("submitInquiry", () => {
@@ -312,6 +342,7 @@ describe("submitInquiry", () => {
         name: "Ada <Lovelace>",
         email: "ada@example.com",
         status: "new",
+        renter_token_hash: expect.stringMatching(/^[0-9a-f]{64}$/),
       }),
     );
     expect(email).toHaveBeenCalledWith(
@@ -521,6 +552,50 @@ describe("deliverReviewDecision", () => {
   });
 });
 
+describe("deliverRenterMessageNotice", () => {
+  it("emails the owner with a thread button and skips when notify_email is false", async () => {
+    vi.stubEnv("RESEND_API_KEY", "re_test_key");
+    vi.stubEnv("EMAIL_FROM", "Furnished Keys <hello@furnishedkeys.com>");
+    serviceWithOwner("delivered+owner@resend.dev");
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: "re_thread" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    vi.spyOn(console, "info").mockImplementation(() => {});
+
+    const sent = await deliverRenterMessageNotice({
+      ownerId,
+      listingTitle: "Pine ADU",
+      inquiryId,
+    });
+    expect(sent.detail).toBe("sent:re_thread");
+    const body = JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body));
+    expect(body.subject).toBe("New message about Pine ADU");
+    expect(body.html).toContain(`/owner/inquiries/${inquiryId}`);
+
+    vi.mocked(createServiceClient).mockReturnValue({
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: { email: "delivered+owner@resend.dev", notify_email: false },
+              error: null,
+            }),
+          }),
+        }),
+      }),
+    } as unknown as ReturnType<typeof createServiceClient>);
+    const skipped = await deliverRenterMessageNotice({
+      ownerId,
+      listingTitle: "Pine ADU",
+      inquiryId,
+    });
+    expect(skipped).toEqual({ id: null, detail: "skipped:notify-email" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("deliverInquiryReply", () => {
   it("emails the renter with the owner's reply-to and an escaped body", async () => {
     vi.stubEnv("RESEND_API_KEY", "re_test_key");
@@ -537,6 +612,7 @@ describe("deliverInquiryReply", () => {
       listingTitle: "Pine ADU",
       body: "Yes.\n<script>",
       replyTo: "delivered+owner@resend.dev",
+      inquiryUrl: "https://furnishedkeys.com/inquiry/raw-token",
     });
 
     expect(result).toEqual({ id: "re_reply", detail: "sent:re_reply" });
@@ -545,6 +621,7 @@ describe("deliverInquiryReply", () => {
     expect(body.subject).toBe("Re: your inquiry for Pine ADU");
     expect(body.reply_to).toBe("delivered+owner@resend.dev");
     expect(body.html).toContain("Yes.<br>&lt;script&gt;");
+    expect(body.html).toContain("https://furnishedkeys.com/inquiry/raw-token");
     expect(body.html).not.toContain("<script>");
   });
 });

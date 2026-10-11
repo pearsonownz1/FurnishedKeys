@@ -87,6 +87,8 @@ export type Profile = {
   full_name: string | null;
   email: string | null;
   phone: string | null;
+  /** When false, inquiry and renter-message mail to this owner is skipped. */
+  notify_email: boolean;
   role: UserRole;
   company_name: string | null;
   created_at: string;
@@ -133,6 +135,8 @@ export type Listing = {
   renewal_canceled: boolean;
   /** Acquisition slug. Default `web`. Owners cannot change it after insert. */
   source: string;
+  /** Last wizard step saved on the draft. Null until the owner saves a step. */
+  setup_step: string | null;
   reviewed_by: string | null;
   reviewed_at: string | null;
   rejection_reason: string | null;
@@ -147,7 +151,8 @@ export type ListingPrivateField =
   | "admin_note"
   | "stripe_subscription_id"
   | "renewal_canceled"
-  | "source";
+  | "source"
+  | "setup_step";
 
 /** Catalog row. Billing, attribution, the admin note, and the street address are omitted. */
 export type ListingPublic = Omit<Listing, ListingPrivateField>;
@@ -237,6 +242,11 @@ export type Inquiry = {
   message: string;
   status: InquiryStatus;
   assigned_to: string | null;
+  /** sha256 hex of the current renter link. Null until the inquiry is created with a token. */
+  renter_token_hash: string | null;
+  last_message_at: string | null;
+  owner_unread: number;
+  renter_unread: number;
   created_at: string;
 };
 
@@ -244,6 +254,7 @@ export type Message = {
   id: string;
   inquiry_id: string;
   sender_id: string | null;
+  sender_role: "owner" | "renter";
   body: string;
   created_at: string;
 };
@@ -272,7 +283,7 @@ type WithOptional<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
 export type LocationInsert = WithOptional<Location, "id" | "active" | "sort">;
 export type ProfileInsert = WithOptional<
   Profile,
-  "full_name" | "email" | "phone" | "role" | "company_name" | "created_at"
+  "full_name" | "email" | "phone" | "notify_email" | "role" | "company_name" | "created_at"
 >;
 export type ListingInsert = WithOptional<
   Listing,
@@ -308,6 +319,7 @@ export type ListingInsert = WithOptional<
   | "stripe_subscription_id"
   | "renewal_canceled"
   | "source"
+  | "setup_step"
   | "reviewed_by"
   | "reviewed_at"
   | "rejection_reason"
@@ -344,11 +356,15 @@ export type InquiryInsert = WithOptional<
   | "pets"
   | "status"
   | "assigned_to"
+  | "renter_token_hash"
+  | "last_message_at"
+  | "owner_unread"
+  | "renter_unread"
   | "created_at"
 >;
 export type MessageInsert = WithOptional<
   Message,
-  "id" | "sender_id" | "created_at"
+  "id" | "sender_id" | "sender_role" | "created_at"
 >;
 export type OwnerLeadInsert = WithOptional<
   OwnerLead,
@@ -433,6 +449,7 @@ export const listingOwnerColumns = [
   "stripe_subscription_id",
   "renewal_canceled",
   "source",
+  "setup_step",
 ] as const;
 
 export const listingFieldNames = [

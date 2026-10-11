@@ -3,7 +3,9 @@
 import { deliverInquiryNotice } from "@/lib/email";
 import type { InquiryActionState } from "@/lib/inquiry";
 import { readInquiryForm, toInquiryInsert, validateInquiry } from "@/lib/inquiry";
+import { expandRanges } from "@/lib/calendar-ranges";
 import { getPublicListings } from "@/lib/listings";
+import { newRenterToken } from "@/lib/renter-token";
 import { createPublicClient } from "@/lib/supabase/public";
 import { logInsertError } from "@/lib/writes";
 
@@ -29,6 +31,7 @@ export async function submitInquiry(
     maxOccupants: listing.max_occupants,
     petsAllowed: listing.pets_allowed,
     availability: listing.availability_windows,
+    blockedDates: expandRanges(listing.blocked_dates ?? []),
   });
   if (!validated.ok) {
     return { ok: false, fieldErrors: validated.fieldErrors };
@@ -37,10 +40,13 @@ export async function submitInquiry(
   // Anonymous insert only. The id is chosen here so the owner email can link
   // to the inquiry. Do not read the inserted inquiry back.
   const inquiryId = crypto.randomUUID();
+  const token = newRenterToken();
   const supabase = createPublicClient();
-  const { error } = await supabase
-    .from("inquiries")
-    .insert({ ...toInquiryInsert(input), id: inquiryId });
+  const { error } = await supabase.from("inquiries").insert({
+    ...toInquiryInsert(input),
+    id: inquiryId,
+    renter_token_hash: token.hash,
+  });
   if (error) {
     return { ok: false, formError: logInsertError("inquiries", error) };
   }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   reorderListingPhotos,
   saveListingFees,
@@ -54,6 +54,7 @@ export function ListingSetup({
   const router = useRouter();
   const [draft, setDraft] = useState(initial);
   const [step, setStep] = useState<ListingStepId>(initialStep);
+  const stepRef = useRef(initialStep);
   const [dirty, setDirty] = useState(false);
   const [calendarDirty, setCalendarDirty] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -81,7 +82,7 @@ export function ListingSetup({
       const response = await fetch(`/api/listings/${listingId}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(toListingPatch(current)),
+        body: JSON.stringify({ ...toListingPatch(current), setup_step: stepRef.current }),
       });
       const fees = await saveListingFees(listingId, feeRows(current, listingId));
       let calendarOk = true;
@@ -120,6 +121,7 @@ export function ListingSetup({
   );
 
   useEffect(() => {
+    stepRef.current = step;
     if (!dirty && !calendarDirty) return;
     const current = draft;
     const saveCalendar = calendarDirty;
@@ -127,11 +129,23 @@ export function ListingSetup({
       void persist(current, saveCalendar);
     }, 700);
     return () => clearTimeout(handle);
-  }, [calendarDirty, dirty, draft, persist]);
+  }, [calendarDirty, dirty, draft, persist, step]);
 
   function go(next: ListingStepId) {
     setStep(next);
+    stepRef.current = next;
     router.replace(`/owners/listings/${listingId}/setup?step=${next}`);
+    void fetch(`/api/listings/${listingId}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ setup_step: next }),
+    });
+  }
+
+  async function saveAndExit() {
+    stepRef.current = step;
+    const ok = await persist(draft, true);
+    if (ok) router.push("/owner");
   }
 
   async function uploadPhotos(files: FileList | null) {
@@ -299,6 +313,9 @@ export function ListingSetup({
           </ol>
           <div className="mt-4 space-y-1 text-sm text-muted">
             <p>{saving ? "Saving draft…" : saved ? "Draft saved" : "Draft not saved"}</p>
+            <button type="button" className="font-semibold text-pine" onClick={() => void saveAndExit()}>
+              Save and exit
+            </button>
           </div>
         </div>
 

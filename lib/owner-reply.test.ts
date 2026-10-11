@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { replyToInquiry } from "@/app/(site)/owner/actions";
 import { sessionUser } from "@/lib/api/owner-listing";
 import { deliverInquiryReply } from "@/lib/email";
+import { createServiceClient } from "@/lib/supabase/service";
 
 vi.mock("@/lib/api/owner-listing", () => ({
   sessionUser: vi.fn(),
@@ -9,6 +10,11 @@ vi.mock("@/lib/api/owner-listing", () => ({
 
 vi.mock("@/lib/email", () => ({
   deliverInquiryReply: vi.fn(),
+  publicOrigin: vi.fn().mockResolvedValue("https://furnishedkeys.com"),
+}));
+
+vi.mock("@/lib/supabase/service", () => ({
+  createServiceClient: vi.fn(),
 }));
 
 const ownerId = "11111111-1111-4111-8111-111111111111";
@@ -26,6 +32,11 @@ function client() {
   const messageInsert = vi.fn().mockResolvedValue({ error: null });
   const statusEq = vi.fn().mockResolvedValue({ error: null });
   const statusUpdate = vi.fn().mockReturnValue({ eq: statusEq });
+  const tokenEq = vi.fn().mockResolvedValue({ error: null });
+  const tokenUpdate = vi.fn().mockReturnValue({ eq: tokenEq });
+  vi.mocked(createServiceClient).mockReturnValue({
+    from: () => ({ update: tokenUpdate }),
+  } as unknown as ReturnType<typeof createServiceClient>);
   const inquiryMaybe = vi.fn().mockResolvedValue({
     data: {
       id: inquiryId,
@@ -59,7 +70,7 @@ function client() {
     },
   };
 
-  return { supabase, messageInsert, statusUpdate, statusEq };
+  return { supabase, messageInsert, statusUpdate, statusEq, tokenUpdate };
 }
 
 beforeEach(() => {
@@ -110,6 +121,7 @@ describe("replyToInquiry", () => {
     expect(db.messageInsert).toHaveBeenCalledWith({
       inquiry_id: inquiryId,
       sender_id: ownerId,
+      sender_role: "owner",
       body: "Yes, those dates work.",
     });
     expect(db.statusUpdate).toHaveBeenCalledWith({ status: "responded" });
@@ -119,7 +131,14 @@ describe("replyToInquiry", () => {
       listingTitle: "Pine ADU",
       body: "Yes, those dates work.",
       replyTo: "delivered+owner@resend.dev",
+      inquiryUrl: expect.stringMatching(/^https:\/\/furnishedkeys\.com\/inquiry\/[A-Za-z0-9_-]+$/),
     });
+    expect(db.tokenUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        renter_token_hash: expect.stringMatching(/^[0-9a-f]{64}$/),
+        renter_unread: 1,
+      }),
+    );
   });
 
   it("still succeeds when the renter email throws", async () => {

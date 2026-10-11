@@ -13,6 +13,7 @@ type Constraints = {
   maxOccupants: number;
   petsAllowed: boolean;
   availability: AvailabilityWindow[];
+  blockedDates?: string[];
 };
 
 export function InquiryCard({

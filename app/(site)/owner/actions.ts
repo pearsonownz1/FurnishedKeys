@@ -1,7 +1,7 @@
 "use server";
 
 import { sessionUser } from "@/lib/api/owner-listing";
-import { deliverInquiryReply } from "@/lib/email";
+import { deliverInquiryReply, publicOrigin } from "@/lib/email";
 import {
   REPLY_MISSING,
   REPLY_SIGN_IN,
@@ -9,6 +9,8 @@ import {
   replySchema,
   type ReplyActionState,
 } from "@/lib/owner-reply";
+import { newRenterToken } from "@/lib/renter-token";
+import { createServiceClient } from "@/lib/supabase/service";
 import { SEND_FAILURE } from "@/lib/writes";
 
 export type { ReplyActionState };
@@ -25,9 +27,11 @@ export type { ReplyActionState };
  * - Inquiry the signed-in user cannot read, or a message/status write that fails:
  *   `{ ok: false, formError: "That inquiry is not on your board." }` or
  *   `{ ok: false, formError: "We couldn't send this. Please try again." }`
- * - Success: inserts `messages` `{ inquiry_id, sender_id, body }`, sets the
- *   inquiry status to `responded`, emails the renter, then
+ * - Success: inserts `messages` `{ inquiry_id, sender_id, sender_role: "owner", body }`,
+ *   sets the inquiry status to `responded`, rotates the renter token (sha256
+ *   stored, raw token only in the email button to `/inquiry/<token>`), then
  *   `{ ok: true, success: true }`. A mail failure is logged and still succeeds.
+ *   A token-rotation failure returns the send-failure form error.
  */
 export async function replyToInquiry(
   _previous: ReplyActionState,
@@ -45,7 +49,7 @@ export async function replyToInquiry(
   const { inquiryId, body } = parsed.data;
   const loaded = await supabase
     .from("inquiries")
-    .select("id, email, listing_id")
+    .select("id, email, listing_id, renter_unread")
     .eq("id", inquiryId)
     .maybeSingle();
   if (loaded.error) {
@@ -77,6 +81,7 @@ export async function replyToInquiry(
   const inserted = await supabase.from("messages").insert({
     inquiry_id: inquiryId,
     sender_id: user.id,
+    sender_role: "owner",
     body,
   });
   if (inserted.error) {
@@ -93,16 +98,37 @@ export async function replyToInquiry(
     return { ok: false, formError: SEND_FAILURE };
   }
 
+  const token = newRenterToken();
+  const service = createServiceClient();
+  if (!service) {
+    console.error("inquiry reply token skipped: service client is not configured");
+    return { ok: false, formError: SEND_FAILURE };
+  }
+  const rotated = await service
+    .from("inquiries")
+    .update({
+      renter_token_hash: token.hash,
+      renter_unread: (loaded.data.renter_unread ?? 0) + 1,
+      last_message_at: new Date().toISOString(),
+    })
+    .eq("id", inquiryId);
+  if (rotated.error) {
+    console.error("inquiry reply token failed", rotated.error.message);
+    return { ok: false, formError: SEND_FAILURE };
+  }
+
   try {
     const ownerEmail = profile.data?.email?.trim();
     if (!ownerEmail) {
       console.error("inquiry reply email skipped: owner has no email");
     } else {
+      const origin = await publicOrigin();
       await deliverInquiryReply({
         to: loaded.data.email,
         listingTitle: listing.data?.title?.trim() || "your home",
         body,
         replyTo: ownerEmail,
+        inquiryUrl: `${origin}/inquiry/${token.raw}`,
       });
     }
   } catch (error) {

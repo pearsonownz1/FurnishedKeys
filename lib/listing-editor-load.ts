@@ -18,6 +18,7 @@ export type LoadedListing = {
   placeLabel: string;
   paidThrough: string | null;
   feeStatus: ListingFeeStatus;
+  setupStep: string | null;
 };
 
 export type EditorLoadResult =
@@ -115,6 +116,7 @@ export async function loadListingEditor(id: string): Promise<EditorLoadResult> {
       placeLabel: place ? locationShort(place) : "",
       paidThrough: listing.fee_paid_through,
       feeStatus: listing.listing_fee_status,
+      setupStep: listing.setup_step,
     },
   };
 }

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { propertyTypes } from "@/lib/db/types";
+import { listingSteps } from "@/lib/listing-draft";
 import { amenityKeys } from "./amenities";
 import { SOURCE_PATTERN } from "./access";
 import { goodForKeys } from "./good-for";
@@ -106,6 +107,9 @@ export const patchListingSchema = z
     address_private: z.string().trim().min(1).max(500).nullable().optional(),
     management: z.enum(["self_managed", "fk_managed"]).optional(),
     availability: z.array(availabilitySchema).max(24).optional(),
+    setup_step: z
+      .enum(listingSteps.map((step) => step.id) as [string, ...string[]])
+      .optional(),
   })
   .strict();
 
