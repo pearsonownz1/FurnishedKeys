@@ -1,6 +1,6 @@
 "use client";
 
-import { confirmOwnerAvailability } from "@/app/(site)/owner/actions";
+import { confirmOwnerAvailability } from "@/app/(owner)/owner/actions";
 import { StayCalendar } from "@/components/listing/stay-calendar";
 import { useRouter } from "next/navigation";
 import { useActionState, useState } from "react";

@@ -1,6 +1,6 @@
 "use client";
 
-import { declineInquiry } from "@/app/(site)/owner/actions";
+import { declineInquiry } from "@/app/(owner)/owner/actions";
 import { useState } from "react";
 
 export function DeclineInquiryButton({ inquiryId }: { inquiryId: string }) {

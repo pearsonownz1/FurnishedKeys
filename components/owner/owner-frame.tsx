@@ -32,7 +32,7 @@ export function OwnerFrame({
   const pathname = usePathname();
 
   return (
-    <div className="flex h-dvh flex-col bg-bg text-sm text-ink">
+    <div className="flex h-dvh flex-col overflow-x-hidden bg-bg text-sm text-ink">
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-line bg-white px-5 md:px-6">
         <Link href="/" className="font-serif text-[22px] tracking-[-0.3px]">
           Furnished <span className="italic">Keys</span>
@@ -69,7 +69,7 @@ export function OwnerFrame({
             className="mt-auto border border-pine py-2.5 text-center font-semibold text-pine"
           />
         </aside>
-        <div className="flex min-h-0 flex-1 flex-col">{children}</div>
+        <div id="content" className="flex min-h-0 flex-1 flex-col">{children}</div>
       </div>
       <nav aria-label="Owner" className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-white md:hidden">
         <ul className="grid grid-cols-4">

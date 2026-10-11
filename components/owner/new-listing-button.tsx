@@ -32,8 +32,13 @@ export function NewListingButton({
   }
 
   return (
-    <div className={className}>
-      <button type="button" onClick={() => void create()} disabled={pending} className="w-full disabled:opacity-70">
+    <div className={className?.includes("mt-auto") ? "mt-auto" : undefined}>
+      <button
+        type="button"
+        onClick={() => void create()}
+        disabled={pending}
+        className={`w-full disabled:opacity-70 ${className?.replace("mt-auto", "") ?? ""}`}
+      >
         + New listing
       </button>
       {error ? (

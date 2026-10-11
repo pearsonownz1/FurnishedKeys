@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { saveOwnerSettings } from "@/app/(site)/owner/actions";
+import { saveOwnerSettings } from "@/app/(owner)/owner/actions";
 import type { AdapterResult } from "@/lib/owner-adapters";
 import type { DashboardOwner } from "@/lib/owner-dashboard";
 import { useActionState } from "react";
