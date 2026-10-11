@@ -94,6 +94,10 @@ describe("owner lead insert", () => {
     ]) {
       expect(page).toContain(phrase);
     }
+    expect(page).toContain("We handle it for you");
+    expect(page).not.toContain("Listing setup, inquiries and showings");
+    expect(page).not.toContain("Screening, leasing and move-ins");
+    expect(page).not.toContain("Tenant messages and maintenance coordination");
     expect(page).not.toMatch(/refund/i);
     expect(form).toContain('name="source"');
     expect(start).toContain("/api/owners/start");
