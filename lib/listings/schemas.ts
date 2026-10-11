@@ -134,10 +134,10 @@ export const checkoutSchema = z.object({
 export const reviewSchema = z
   .object({
     action: z.enum(["approve", "request_changes", "reject"]),
-    note: z.string().trim().min(1).max(2000).optional(),
+    note: z.string().trim().min(1).max(4000).optional(),
   })
   .superRefine((value, context) => {
-    if (value.action !== "approve" && !value.note) {
+    if (value.action === "request_changes" && !value.note) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["note"],
