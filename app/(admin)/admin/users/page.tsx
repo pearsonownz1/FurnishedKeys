@@ -1,17 +1,21 @@
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { UsersTable } from "@/components/admin/users-table";
-import { userTab, userTabCounts } from "@/lib/admin-console";
-import { loadAdminConsole } from "@/lib/admin-console-load";
+import { loadAdminUsers } from "@/lib/admin-load";
 import { canonical } from "@/lib/site";
 
 export const metadata = {
   title: "Users",
-  description: "Owners and renters on Furnished Keys.",
+  description: "Accounts on Furnished Keys.",
   ...canonical("/admin/users"),
 };
 
 type Search = Record<string, string | string[] | undefined>;
+
+function userTab(value: string | undefined): "all" | "owner" | "renter" {
+  if (value === "owner" || value === "renter") return value;
+  return "all";
+}
 
 export default function UsersPage({ searchParams }: { searchParams: Promise<Search> }) {
   return (
@@ -23,11 +27,7 @@ export default function UsersPage({ searchParams }: { searchParams: Promise<Sear
 
 async function Screen({ searchParams }: { searchParams: Promise<Search> }) {
   await connection();
-  const gate = await loadAdminConsole();
-  if (gate.kind !== "ready") return null;
-  const params = await searchParams;
+  const [users, params] = await Promise.all([loadAdminUsers(), searchParams]);
   const raw = params.role;
-  const tab = userTab(Array.isArray(raw) ? raw[0] : raw);
-  const users = tab === "all" ? gate.data.users : gate.data.users.filter((user) => user.role === tab);
-  return <UsersTable users={users} counts={userTabCounts(gate.data.users)} tab={tab} />;
+  return <UsersTable users={users} tab={userTab(Array.isArray(raw) ? raw[0] : raw)} now={new Date()} />;
 }

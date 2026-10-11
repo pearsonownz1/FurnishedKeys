@@ -1,7 +1,8 @@
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { Overview } from "@/components/admin/overview";
-import { loadAdminConsole } from "@/lib/admin-console-load";
+import { loadAdminCounts, loadRecentActivity, loadReviewQueue } from "@/lib/admin-load";
+import { loadAdminStaff } from "@/lib/admin-staff";
 import { canonical } from "@/lib/site";
 
 export const metadata = {
@@ -20,7 +21,11 @@ export default function AdminOverviewPage() {
 
 async function Screen() {
   await connection();
-  const gate = await loadAdminConsole();
-  if (gate.kind !== "ready") return null;
-  return <Overview data={gate.data} now={new Date()} />;
+  const [staff, counts, queue, activity] = await Promise.all([
+    loadAdminStaff(),
+    loadAdminCounts(),
+    loadReviewQueue(),
+    loadRecentActivity(20),
+  ]);
+  return <Overview name={staff.name} counts={counts} queue={queue} activity={activity} now={new Date()} />;
 }

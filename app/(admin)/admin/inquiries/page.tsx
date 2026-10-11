@@ -1,8 +1,7 @@
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { InquiriesTable } from "@/components/admin/inquiries-table";
-import { inquiryTab, inquiryTabCounts } from "@/lib/admin-console";
-import { loadAdminConsole } from "@/lib/admin-console-load";
+import { loadAdminInquiries } from "@/lib/admin-load";
 import { canonical } from "@/lib/site";
 
 export const metadata = {
@@ -12,6 +11,11 @@ export const metadata = {
 };
 
 type Search = Record<string, string | string[] | undefined>;
+
+function inquiryTab(value: string | undefined): "all" | "unreplied" | "replied" {
+  if (value === "unreplied" || value === "replied") return value;
+  return "all";
+}
 
 export default function InquiriesPage({ searchParams }: { searchParams: Promise<Search> }) {
   return (
@@ -23,18 +27,12 @@ export default function InquiriesPage({ searchParams }: { searchParams: Promise<
 
 async function Screen({ searchParams }: { searchParams: Promise<Search> }) {
   await connection();
-  const gate = await loadAdminConsole();
-  if (gate.kind !== "ready") return null;
-  const params = await searchParams;
+  const [inquiries, params] = await Promise.all([loadAdminInquiries(), searchParams]);
   const raw = params.filter;
-  const tab = inquiryTab(Array.isArray(raw) ? raw[0] : raw);
-  const inquiries =
-    tab === "all" ? gate.data.inquiries : gate.data.inquiries.filter((row) => row.reply === tab);
   return (
     <InquiriesTable
       inquiries={inquiries}
-      counts={inquiryTabCounts(gate.data.inquiries)}
-      tab={tab}
+      tab={inquiryTab(Array.isArray(raw) ? raw[0] : raw)}
       now={new Date()}
     />
   );

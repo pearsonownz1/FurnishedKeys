@@ -1,8 +1,15 @@
+import type { Metadata } from "next";
 import { connection } from "next/server";
-import { redirect } from "next/navigation";
 import { Suspense, type ReactNode } from "react";
 import { AdminFrame } from "@/components/admin/admin-frame";
-import { loadAdminConsole } from "@/lib/admin-console-load";
+import { loadAdminCounts } from "@/lib/admin-load";
+import { loadAdminStaff } from "@/lib/admin-staff";
+
+const FORBIDDEN = "NEXT_HTTP_ERROR_FALLBACK;403";
+
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   return (
@@ -12,20 +19,37 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   );
 }
 
+function isForbidden(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "digest" in error && error.digest === FORBIDDEN;
+}
+
 async function Frame({ children }: { children: ReactNode }) {
   await connection();
-  const gate = await loadAdminConsole();
-  if (gate.kind === "signed-out") redirect("/sign-in?next=%2Fadmin");
-  if (gate.kind === "forbidden") {
+  const gate = await openConsole();
+  if (!gate.ok) {
     return (
-      <main id="content" className="px-5 py-16">
-        <p className="text-sm">Not authorized</p>
+      <main id="content" className="bg-bg px-5 py-16 text-sm text-ink">
+        <h1 className="font-serif text-4xl font-normal">Not authorized</h1>
+        <p className="mt-3 text-muted">This page is for Furnished Keys staff.</p>
       </main>
     );
   }
   return (
-    <AdminFrame staff={gate.data.staff} reviewCount={gate.data.waiting} leadCount={gate.data.newLeads}>
+    <AdminFrame staff={gate.staff} reviewCount={gate.counts.review_waiting} leadCount={gate.counts.leads_new}>
       {children}
     </AdminFrame>
   );
+}
+
+async function openConsole() {
+  try {
+    const counts = await loadAdminCounts();
+    const staff = await loadAdminStaff();
+    return { ok: true as const, counts, staff };
+  } catch (error) {
+    // A thrown forbidden() inside this Suspense boundary replaces the shell with an empty fallback.
+    // The loader still rejects non-admins; show the staff page from that digest.
+    if (!isForbidden(error)) throw error;
+    return { ok: false as const };
+  }
 }

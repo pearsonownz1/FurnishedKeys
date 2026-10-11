@@ -1,8 +1,8 @@
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { ListingsTable } from "@/components/admin/listings-table";
-import { listingTab, listingTabCounts } from "@/lib/admin-console";
-import { loadAdminConsole } from "@/lib/admin-console-load";
+import { loadAdminListings } from "@/lib/admin-load";
+import { listingStatusParam } from "@/lib/admin-present";
 import { canonical } from "@/lib/site";
 
 export const metadata = {
@@ -23,11 +23,8 @@ export default function AdminListingsPage({ searchParams }: { searchParams: Prom
 
 async function Screen({ searchParams }: { searchParams: Promise<Search> }) {
   await connection();
-  const gate = await loadAdminConsole();
-  if (gate.kind !== "ready") return null;
-  const params = await searchParams;
-  const raw = params.filter;
-  const tab = listingTab(Array.isArray(raw) ? raw[0] : raw);
-  const listings = tab === "all" ? gate.data.listings : gate.data.listings.filter((row) => row.bucket === tab);
-  return <ListingsTable listings={listings} counts={listingTabCounts(gate.data.listings)} tab={tab} />;
+  const [listings, params] = await Promise.all([loadAdminListings(), searchParams]);
+  const raw = params.status;
+  const status = listingStatusParam(Array.isArray(raw) ? raw[0] : raw);
+  return <ListingsTable listings={listings} tab={status ?? "all"} />;
 }

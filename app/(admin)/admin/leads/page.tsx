@@ -1,8 +1,8 @@
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { LeadsTable } from "@/components/admin/leads-table";
-import { leadTab, leadTabCounts, matchesLeadTab } from "@/lib/admin-console";
-import { loadAdminConsole } from "@/lib/admin-console-load";
+import { loadOwnerLeads } from "@/lib/admin-load";
+import { leadStatusParam } from "@/lib/admin-present";
 import { canonical } from "@/lib/site";
 
 export const metadata = {
@@ -23,11 +23,8 @@ export default function LeadsPage({ searchParams }: { searchParams: Promise<Sear
 
 async function Screen({ searchParams }: { searchParams: Promise<Search> }) {
   await connection();
-  const gate = await loadAdminConsole();
-  if (gate.kind !== "ready") return null;
-  const params = await searchParams;
+  const [leads, params] = await Promise.all([loadOwnerLeads(), searchParams]);
   const raw = params.status;
-  const tab = leadTab(Array.isArray(raw) ? raw[0] : raw);
-  const leads = gate.data.leads.filter((lead) => matchesLeadTab(lead.status, tab));
-  return <LeadsTable leads={leads} counts={leadTabCounts(gate.data.leads)} tab={tab} />;
+  const status = leadStatusParam(Array.isArray(raw) ? raw[0] : raw);
+  return <LeadsTable leads={leads} tab={status ?? "all"} />;
 }

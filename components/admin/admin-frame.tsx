@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Home, LayoutGrid, MessageSquare, ShieldCheck, UserPlus, Users } from "lucide-react";
 import type { ReactNode } from "react";
 import { AppShell, type ShellLink } from "@/components/shell/app-shell";
-import type { AdminStaff } from "@/lib/admin-console";
+import type { AdminStaff } from "@/lib/admin-staff";
 
 export function AdminFrame({
   staff,
