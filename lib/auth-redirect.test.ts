@@ -19,7 +19,7 @@ describe("safeNext", () => {
     expect(requestedNext("")).toBeNull();
     expect(requestedNext("https://evil.example/owner")).toBeNull();
     expect(requestedNext("/owner?tab=drafts")).toBe("/owner?tab=drafts");
-    expect(dashboardForRole("admin")).toBe("/admin/listings");
+    expect(dashboardForRole("admin")).toBe("/admin");
     expect(dashboardForRole("owner")).toBe("/owner");
     expect(dashboardForRole("renter")).toBe("/owner");
     expect(dashboardForRole(null)).toBe("/owner");
