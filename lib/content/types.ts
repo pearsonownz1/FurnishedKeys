@@ -1,3 +1,5 @@
+import type { Cover } from "./cover";
+
 export type InlineNode =
   | { type: "text"; value: string }
   | { type: "strong"; children: InlineNode[] }
@@ -22,6 +24,7 @@ export type Post = {
   date: string;
   modified: string;
   author: string;
+  cover: Cover | null;
   body: string;
   blocks: BlockNode[];
   readingMinutes: number;
@@ -39,6 +42,7 @@ export type ContentPage = {
   id: ContentPageId;
   title: string;
   description: string;
+  cover: Cover | null;
   body: string;
   blocks: BlockNode[];
 };

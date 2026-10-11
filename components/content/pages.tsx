@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { Suspense, type ReactNode } from "react";
+import { ContentCover } from "@/components/content/cover";
 import { ArticleSections, MarkdownBlocks, splitArticle } from "@/components/content/markdown-body";
 import { Breadcrumbs } from "@/components/content/breadcrumbs";
 import { JsonLd } from "@/components/content/json-ld";
@@ -36,7 +37,7 @@ function Note({ text }: { text: string }) {
 
 export async function guideMetadata(id: ContentPageId, path: string) {
   const page = await getContentPage(id);
-  return pageMetadata({ title: page.title, description: page.description, path });
+  return pageMetadata({ title: page.title, description: page.description, path, cover: page.cover });
 }
 
 export async function GuidePage({ id, path }: { id: ContentPageId; path: string }) {
@@ -56,6 +57,9 @@ export async function GuidePage({ id, path }: { id: ContentPageId; path: string 
         <h1 className="mt-6 max-w-3xl font-serif text-[clamp(2.5rem,6vw,4.25rem)] leading-[0.98] font-normal tracking-[-1px]">
           {heading}
         </h1>
+        <div className="mt-8">
+          <ContentCover cover={page.cover} priority bordered sizes="(min-width: 1024px) 1128px, 100vw" />
+        </div>
         {lead.length > 0 ? (
           <div className="mt-6 max-w-[40rem]">
             <MarkdownBlocks blocks={lead} />
@@ -175,6 +179,9 @@ export async function PostPage({ params }: { params: Promise<{ slug: string }> }
             <span aria-hidden="true"> · </span>
             {post.author}
           </p>
+          <div className="mt-8">
+            <ContentCover cover={post.cover} priority bordered sizes="(min-width: 1024px) 1128px, 100vw" />
+          </div>
           {lead.length > 0 ? (
             <div className="mt-8 max-w-[40rem]">
               <MarkdownBlocks blocks={lead} />
@@ -222,7 +229,7 @@ export async function PostPage({ params }: { params: Promise<{ slug: string }> }
 
 export async function faqMetadata() {
   const faq = await getFaq();
-  return pageMetadata({ title: faq.seoTitle, description: faq.description, path: "/faq" });
+  return pageMetadata({ title: faq.seoTitle, description: faq.description, path: "/faq", cover: faq.cover });
 }
 
 export async function FaqPage() {
@@ -242,6 +249,9 @@ export async function FaqPage() {
         <h1 className="mt-6 max-w-[14ch] font-serif text-[clamp(2.75rem,6vw,4.5rem)] leading-[0.98] font-normal tracking-[-1px]">
           {faq.title}
         </h1>
+        <div className="mt-8">
+          <ContentCover cover={faq.cover} priority bordered sizes="(min-width: 1024px) 1128px, 100vw" />
+        </div>
       </section>
       {faq.sections.map((section) => (
         <section key={section.heading} className="border-t border-line">

@@ -1,6 +1,7 @@
-import { readdir, readFile } from "node:fs/promises";
+import { access, readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { cacheLife } from "next/cache";
+import { contentCover, coverFromCredit, coverKey, type Cover, type CreditRecord } from "./cover";
 import { parseFaq } from "./faq";
 import { markdownBlocks } from "./markdown";
 import { parseContent } from "./parse";
@@ -18,12 +19,41 @@ const PAGE_FILES: Record<ContentPageId, string> = {
   landlords: "resources-landlords.md",
 };
 
+const PAGE_COVER_KEYS: Record<ContentPageId, string> = {
+  faq: "faq",
+  help: "help",
+  renters: "resources-renters",
+  landlords: "resources-landlords",
+};
+
 function comparePosts(left: Post, right: Post): number {
   if (left.date !== right.date) return left.date < right.date ? 1 : -1;
   return left.title.localeCompare(right.title);
 }
 
-function toPost(raw: string, fileName: string): Post {
+async function getCovers(): Promise<Record<string, Cover>> {
+  "use cache";
+  cacheLife("max");
+  const raw = await readFile(path.join(CONTENT_ROOT, "credits.json"), "utf8");
+  const records = JSON.parse(raw) as CreditRecord[];
+  if (!Array.isArray(records)) throw new Error("content/credits.json must be a list");
+  const covers: Record<string, Cover> = {};
+  for (const record of records) {
+    const cover = coverFromCredit(record, `content/credits.json (${record.file})`);
+    const key = coverKey(record.file);
+    if (covers[key]) throw new Error(`Duplicate cover for ${key}`);
+    await access(path.join(process.cwd(), "public", cover.src.slice(1)));
+    if (cover.shareSrc) await access(path.join(process.cwd(), "public", cover.shareSrc.slice(1)));
+    covers[key] = cover;
+  }
+  return covers;
+}
+
+function withCover(frontmatter: Cover | null, key: string, covers: Record<string, Cover>): Cover | null {
+  return frontmatter ?? covers[key] ?? null;
+}
+
+function toPost(raw: string, fileName: string, covers: Record<string, Cover>): Post {
   const parsed = parseContent(raw, `content/blog/${fileName}`);
   if (!parsed.slug || !SLUG.test(parsed.slug) || RESERVED_SLUGS.has(parsed.slug)) {
     throw new Error(`content/blog/${fileName} needs a lowercase hyphenated slug`);
@@ -45,6 +75,18 @@ function toPost(raw: string, fileName: string): Post {
     date: parsed.date,
     modified: parsed.updated ?? parsed.date,
     author: parsed.author,
+    cover: withCover(
+      contentCover({
+        cover: parsed.cover,
+        coverAlt: parsed.coverAlt,
+        coverCredit: parsed.coverCredit,
+        coverCreditUrl: parsed.coverCreditUrl,
+        altFallback: parsed.title,
+        fileLabel: `content/blog/${fileName}`,
+      }),
+      parsed.slug,
+      covers,
+    ),
     body: parsed.body,
     blocks: markdownBlocks(parsed.body),
     readingMinutes: readingMinutes(parsed.body),
@@ -54,10 +96,11 @@ function toPost(raw: string, fileName: string): Post {
 export async function getPosts(): Promise<Post[]> {
   "use cache";
   cacheLife("max");
+  const covers = await getCovers();
   const dir = path.join(CONTENT_ROOT, "blog");
   const files = (await readdir(dir)).filter((file) => file.endsWith(".md")).sort();
   const posts = await Promise.all(
-    files.map(async (file) => toPost(await readFile(path.join(dir, file), "utf8"), file)),
+    files.map(async (file) => toPost(await readFile(path.join(dir, file), "utf8"), file, covers)),
   );
   const seen = new Set<string>();
   for (const post of posts) {
@@ -91,6 +134,7 @@ export async function getCategory(slug: string): Promise<Category | null> {
 export async function getContentPage(id: ContentPageId): Promise<ContentPage> {
   "use cache";
   cacheLife("max");
+  const covers = await getCovers();
   const file = PAGE_FILES[id];
   const raw = await readFile(path.join(CONTENT_ROOT, file), "utf8");
   const parsed = parseContent(raw, `content/${file}`);
@@ -98,14 +142,26 @@ export async function getContentPage(id: ContentPageId): Promise<ContentPage> {
     id,
     title: parsed.title,
     description: parsed.description,
+    cover: withCover(
+      contentCover({
+        cover: parsed.cover,
+        coverAlt: parsed.coverAlt,
+        coverCredit: parsed.coverCredit,
+        coverCreditUrl: parsed.coverCreditUrl,
+        altFallback: parsed.title,
+        fileLabel: `content/${file}`,
+      }),
+      PAGE_COVER_KEYS[id],
+      covers,
+    ),
     body: parsed.body,
     blocks: markdownBlocks(parsed.body),
   };
 }
 
-export async function getFaq(): Promise<FaqDocument & { seoTitle: string; description: string }> {
+export async function getFaq(): Promise<FaqDocument & { seoTitle: string; description: string; cover: Cover | null }> {
   const page = await getContentPage("faq");
-  return { ...parseFaq(page.body), seoTitle: page.title, description: page.description };
+  return { ...parseFaq(page.body), seoTitle: page.title, description: page.description, cover: page.cover };
 }
 
 export function relatedPosts(posts: Post[], post: Post, limit = 3): Post[] {

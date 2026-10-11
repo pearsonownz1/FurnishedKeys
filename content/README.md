@@ -14,6 +14,10 @@ slug: my-new-post
 category: Renters
 date: 2026-10-11
 author: Furnished Keys Team
+# cover: /blog/covers/my-new-post.jpg
+# coverAlt: What the photograph shows
+# coverCredit: Photographer Name
+# coverCreditUrl: https://unsplash.com/photos/example
 ---
 
 The opening paragraph is the lead, under the title. The title is not repeated as a heading.
@@ -31,8 +35,13 @@ Required frontmatter:
 - `date` — `YYYY-MM-DD`
 - `updated` — optional `YYYY-MM-DD`. When present, this is `dateModified` in the article data and the sitemap. Otherwise the publish date is used
 - `author` — shown on the post and in the article structured data
+- `cover`, `coverAlt`, `coverCredit`, and `coverCreditUrl` — optional. A `cover` path is a file under `public/blog/covers/`. These override the shared credit list for that post.
 
-After the file is committed, the post, its category, the sitemap, the RSS feed at `/blog/rss.xml`, and the Open Graph image are generated with the rest of the site.
+The current posts and the FAQ, help, and resource pages take their photos from `content/credits.json`. Each entry names a 1600×900 `<slug>.jpg` and a 1200×630 `<slug>-share.jpg` in `public/blog/covers/`. The alt text is used as written. The share file is the Open Graph and Twitter image. Under every cover the line reads: Photo: photographer, license (linked), via Wikimedia Commons.
+
+A post with no cover keeps a Furnished Keys block in the photo frame and uses the site share image in social tags.
+
+After the file is committed, the post, its category, the sitemap, and the RSS feed at `/blog/rss.xml` are generated with the rest of the site.
 
 Landlord posts end with a link to list a property. Other posts end with a link to find a home.
 
@@ -45,6 +54,6 @@ Landlord posts end with a link to list a property. Other posts end with a link t
 | `content/resources-renters.md` | `/resources/renters` |
 | `content/resources-landlords.md` | `/resources/landlords` |
 
-Each of those files needs `title` and `description` frontmatter. Those values are the SEO title and meta description. The first heading in the file is the page heading.
+Each of those files needs `title` and `description` frontmatter. Those values are the SEO title and meta description. The first heading in the file is the page heading. The same optional `cover`, `coverAlt`, `coverCredit`, and `coverCreditUrl` fields work on these pages.
 
 `nav-and-footer.md` is the navigation spec. It is not a page.

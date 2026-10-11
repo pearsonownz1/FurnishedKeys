@@ -1,18 +1,31 @@
 import type { Metadata } from "next";
 import { SITE_ORIGIN, canonical } from "@/lib/site";
 import { BLOG_DESCRIPTION, BLOG_TITLE } from "./copy";
+import type { Cover } from "./cover";
 import type { Post } from "./types";
 
-const shareImage = {
+export const DEFAULT_SHARE_IMAGE = {
   url: "/demo/hero.jpg",
   width: 1200,
   height: 800,
   alt: "Furnished living room with pines beyond the windows",
 };
 
+export function shareImageFor(cover: Cover | null) {
+  if (!cover) return DEFAULT_SHARE_IMAGE;
+  if (cover.shareSrc) return { url: cover.shareSrc, width: 1200, height: 630, alt: cover.alt };
+  return { url: cover.src, width: 1600, height: 900, alt: cover.alt };
+}
+
 export { BLOG_DESCRIPTION, BLOG_TITLE };
 
-export function pageMetadata(input: { title: string; description: string; path: string }): Metadata {
+export function pageMetadata(input: {
+  title: string;
+  description: string;
+  path: string;
+  cover?: Cover | null;
+}): Metadata {
+  const image = shareImageFor(input.cover ?? null);
   return {
     title: { absolute: input.title },
     description: input.description,
@@ -22,13 +35,13 @@ export function pageMetadata(input: { title: string; description: string; path: 
       description: input.description,
       url: input.path,
       type: "website",
-      images: [shareImage],
+      images: [image],
     },
     twitter: {
       card: "summary_large_image",
       title: input.title,
       description: input.description,
-      images: [shareImage.url],
+      images: [image.url],
     },
   };
 }
@@ -47,12 +60,7 @@ export function blogIndexMetadata(): Metadata {
 
 export function postMetadata(post: Post): Metadata {
   const path = `/blog/${post.slug}`;
-  const image = {
-    url: `${path}/opengraph-image`,
-    width: 1200,
-    height: 630,
-    alt: post.title,
-  };
+  const image = shareImageFor(post.cover);
   const published = `${post.date}T00:00:00.000Z`;
   const modified = `${post.modified}T00:00:00.000Z`;
   return {
@@ -104,7 +112,7 @@ export function articleJsonLd(post: Post) {
       "@type": "Organization",
       name: post.author,
     },
-    image: [new URL(`/blog/${post.slug}/opengraph-image`, SITE_ORIGIN).toString()],
+    image: [new URL(shareImageFor(post.cover).url, SITE_ORIGIN).toString()],
     mainEntityOfPage: url,
   };
 }

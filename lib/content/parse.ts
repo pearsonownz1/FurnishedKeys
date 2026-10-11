@@ -8,6 +8,10 @@ export type ParsedContent = {
   date: string | null;
   updated: string | null;
   author: string | null;
+  cover: string | null;
+  coverAlt: string | null;
+  coverCredit: string | null;
+  coverCreditUrl: string | null;
   body: string;
 };
 
@@ -36,6 +40,10 @@ export function parseContent(raw: string, fileLabel = "content file"): ParsedCon
     date: asString(parsed.data.date),
     updated: asString(parsed.data.updated),
     author: asString(parsed.data.author),
+    cover: asString(parsed.data.cover),
+    coverAlt: asString(parsed.data.coverAlt),
+    coverCredit: asString(parsed.data.coverCredit),
+    coverCreditUrl: asString(parsed.data.coverCreditUrl),
     body: parsed.content.replace(/^\n/, "").trimEnd(),
   };
 }
