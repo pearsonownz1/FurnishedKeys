@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Ellipsis, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
+import { BrandLockup } from "@/components/brand-lockup";
 
 export type ShellLink = {
   href: string;
@@ -53,15 +54,8 @@ export function AppShell({
   return (
     <div className="flex h-dvh flex-col overflow-x-hidden bg-bg text-sm text-ink">
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-line bg-white px-5 md:px-6">
-        <Link href="/" className="font-serif text-[22px] tracking-[-0.3px]">
-          Furnished <span className="italic">Keys</span>
-          {mark ? (
-            <span className="ml-2.5 inline-block bg-ink px-[7px] py-[3px] align-[4px] text-[10px] font-semibold tracking-[0.08em] text-white">
-              {mark}
-            </span>
-          ) : null}
-        </Link>
-        <div className="flex items-center gap-5 text-muted">
+        <BrandLockup href="/" mark={mark} priority className="text-[22px] md:hidden" />
+        <div className="ml-auto flex items-center gap-5 text-muted">
           <Link href={topLink.href} className="hover:text-ink">
             {topLink.label}
           </Link>
@@ -83,6 +77,7 @@ export function AppShell({
       </header>
       <div className="flex min-h-0 flex-1">
         <aside className="hidden w-[232px] shrink-0 flex-col border-r border-line bg-white px-3 py-5 md:flex">
+          <BrandLockup href="/" mark={mark} priority className="mb-5 px-3 text-[22px]" />
           <nav aria-label={navLabel} className="grid gap-0.5">
             {items.map((item) => (
               <NavLink key={item.href} item={item} pathname={pathname} />

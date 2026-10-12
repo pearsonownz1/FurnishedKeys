@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useHydrated } from "@/components/auth/use-hydrated";
+import { BrandLockup } from "@/components/brand-lockup";
 import { ResourcesNav } from "@/components/resources-nav";
 import type { UserRole } from "@/lib/db/types";
 
@@ -37,9 +38,7 @@ export function SiteHeader({
     return (
       <header className="border-b border-line bg-surface text-ink">
         <div className="flex h-16 items-center justify-between gap-3 px-5 md:px-8">
-          <Link href="/" className="font-serif text-[22px] tracking-[-0.3px] sm:text-[26px]">
-            Furnished <span className="italic">Keys</span>
-          </Link>
+          <BrandLockup href="/" className="text-[22px] sm:text-[26px]" />
           <Link href="/owners" className="text-sm">
             Save and exit
           </Link>
@@ -73,12 +72,12 @@ export function SiteHeader({
             : "flex h-16 items-center justify-between gap-3 px-5 md:px-8"
         }
       >
-        <Link
+        <BrandLockup
           href="/"
-          className="font-serif text-[22px] tracking-[-0.3px] sm:text-[26px]"
-        >
-          Furnished <span className="italic">Keys</span>
-        </Link>
+          onDark={overlay}
+          priority
+          className="text-[22px] sm:text-[26px]"
+        />
 
         <nav
           aria-label="Primary"

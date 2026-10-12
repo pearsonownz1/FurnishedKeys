@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense } from "react";
+import { BrandLockup } from "@/components/brand-lockup";
 import { brand } from "@/lib/brand";
 import { aboutPage } from "@/lib/about-copy";
 import { footerColumns } from "@/lib/content/nav";
@@ -10,7 +11,10 @@ import { ownersRegionName } from "@/lib/owners-copy";
 export function SiteFooter() {
   return (
     <footer className="border-t border-line">
-      <div className="shell grid gap-10 py-14 sm:grid-cols-3 lg:py-16">
+      <div className="shell pt-14 lg:pt-16">
+        <BrandLockup href="/" className="text-[22px] sm:text-[26px]" />
+      </div>
+      <div className="shell grid gap-10 py-10 sm:grid-cols-3 lg:pb-16">
         {footerColumns.map((column) => (
           <nav key={column.title} aria-label={column.title}>
             <h2 className="text-xs tracking-[0.14em] text-muted uppercase">{column.title}</h2>
