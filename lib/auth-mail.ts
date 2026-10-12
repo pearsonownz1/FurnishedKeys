@@ -71,12 +71,16 @@ function actionLinkToken(actionLink: string | null | undefined): string {
   }
 }
 
-/** Wordmark, pine button, plain footer. Auth mail only. */
+/** Icon, wordmark, pine button, plain footer. Auth mail only. */
 export function authEmailHtml(input: { intro: string; button: string; href: string }): string {
   const href = escapeAttr(input.href);
+  const icon = `${SITE_ORIGIN}/email/fk-icon.png`;
   return (
     `<div style="font-family:Georgia,'Times New Roman',serif;font-size:16px;line-height:1.5;color:#1c1917;max-width:480px;">` +
-    `<p style="margin:0 0 28px;font-size:22px;letter-spacing:-0.4px;">Furnished Keys</p>` +
+    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 28px;border-collapse:collapse;">` +
+    `<tr><td style="vertical-align:middle;padding:0 10px 0 0;line-height:0;">` +
+    `<img src="${icon}" width="64" height="64" alt="Furnished Keys" style="display:block;width:64px;height:64px;border:0;border-radius:2px;" />` +
+    `</td><td style="vertical-align:middle;font-size:22px;letter-spacing:-0.4px;line-height:1;">Furnished Keys</td></tr></table>` +
     `<p style="margin:0 0 24px;">${escapeText(input.intro)}</p>` +
     `<p style="margin:0 0 28px;"><a href="${href}" style="display:inline-block;background:#2e4a3b;color:#ffffff;text-decoration:none;padding:12px 20px;font-family:system-ui,sans-serif;font-size:14px;font-weight:600;">${escapeText(input.button)}</a></p>` +
     `<p style="margin:0;color:#78716c;font-size:13px;">Furnished Keys<br>${escapeText(SITE_ORIGIN)}</p>` +

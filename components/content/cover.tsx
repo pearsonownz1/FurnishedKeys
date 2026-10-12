@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { brand } from "@/lib/brand";
+import { BrandLockup } from "@/components/brand-lockup";
 import { sourceName, type Cover } from "@/lib/content/cover";
 import { externalLinkRel } from "@/lib/content/text";
 
@@ -24,7 +24,6 @@ export function ContentCover({
   bordered?: boolean;
   padCaption?: boolean;
 }) {
-  const wordmark = brand.name.split(" ");
   const showCredit = Boolean(cover && (cover.photographer || cover.license || cover.sourceUrl));
   return (
     <figure>
@@ -42,10 +41,7 @@ export function ContentCover({
           <div aria-hidden="true" className="absolute inset-0 flex flex-col bg-surface">
             <div className="h-1.5 bg-pine" />
             <div className="flex flex-1 items-end p-5 sm:p-6">
-              <p className="font-serif text-2xl tracking-[-0.3px] text-ink">
-                {wordmark[0]}{" "}
-                {wordmark.length > 1 ? <span className="italic">{wordmark.slice(1).join(" ")}</span> : null}
-              </p>
+              <BrandLockup href={null} className="text-2xl text-ink" />
             </div>
           </div>
         )}

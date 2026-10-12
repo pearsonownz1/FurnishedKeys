@@ -209,9 +209,16 @@ describe("auth mail helpers", () => {
       ),
     ).toBe(actionToken);
     expect(verifyToken({ hashed_token: hashed, action_link: null }, "hashed")).toBe(hashed);
-    expect(authEmailHtml({ intro: "Hello", button: "Reset password", href: "https://www.furnishedkeys.com/auth/confirm" })).toContain(
-      "background:#2e4a3b",
+    const html = authEmailHtml({
+      intro: "Hello",
+      button: "Reset password",
+      href: "https://www.furnishedkeys.com/auth/confirm",
+    });
+    expect(html).toContain("background:#2e4a3b");
+    expect(html).toContain(
+      '<img src="https://www.furnishedkeys.com/email/fk-icon.png" width="64" height="64" alt="Furnished Keys"',
     );
+    expect(html).toContain("Furnished Keys");
   });
 
   it("keeps signup on the confirmed admin path", async () => {

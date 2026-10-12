@@ -194,13 +194,13 @@ describe("content files", () => {
     const fallback = postMetadata(plain);
     expect(fallback.openGraph && "images" in fallback.openGraph ? fallback.openGraph.images : null).toEqual([
       {
-        url: "/demo/hero.jpg",
+        url: "/og.png",
         width: 1200,
-        height: 800,
-        alt: "Furnished living room with pines beyond the windows",
+        height: 630,
+        alt: "Furnished Keys. Furnished homes. Flexible stays.",
       },
     ]);
-    expect(articleJsonLd(plain).image).toEqual(["https://www.furnishedkeys.com/demo/hero.jpg"]);
+    expect(articleJsonLd(plain).image).toEqual(["https://www.furnishedkeys.com/og.png"]);
   });
 
   it("uses the designer cover, share image, and credit for every post and guide", () => {

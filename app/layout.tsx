@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Instrument_Serif, Inter } from "next/font/google";
 import { brand } from "@/lib/brand";
+import { DEFAULT_SHARE_IMAGE } from "@/lib/content/seo";
 import "./globals.css";
 
 const inter = Inter({
@@ -26,17 +27,23 @@ export const metadata: Metadata = {
   },
   description: brand.subline,
   applicationName: brand.name,
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "16x16 32x32 48x48" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
   openGraph: {
     title: brand.title,
     description: brand.subline,
     siteName: brand.name,
     type: "website",
-    images: [
-      {
-        url: "/demo/hero.jpg",
-        alt: "Furnished living room with pines beyond the windows",
-      },
-    ],
+    images: [DEFAULT_SHARE_IMAGE],
+  },
+  twitter: {
+    card: "summary_large_image",
+    images: [DEFAULT_SHARE_IMAGE.url],
   },
 };
 

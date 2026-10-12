@@ -5,10 +5,10 @@ import type { Cover } from "./cover";
 import type { Post } from "./types";
 
 export const DEFAULT_SHARE_IMAGE = {
-  url: "/demo/hero.jpg",
+  url: "/og.png",
   width: 1200,
-  height: 800,
-  alt: "Furnished living room with pines beyond the windows",
+  height: 630,
+  alt: "Furnished Keys. Furnished homes. Flexible stays.",
 };
 
 export function shareImageFor(cover: Cover | null) {
