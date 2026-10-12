@@ -12,7 +12,7 @@ export function SiteFooter() {
   return (
     <footer className="border-t border-line">
       <div className="shell pt-14 lg:pt-16">
-        <BrandLockup href="/" iconSize={24} className="text-[22px] sm:text-[26px]" />
+        <BrandLockup href="/" iconSize={36} className="text-[22px] sm:text-[26px]" />
       </div>
       <div className="shell grid gap-10 py-10 sm:grid-cols-3 lg:pb-16">
         {footerColumns.map((column) => (
