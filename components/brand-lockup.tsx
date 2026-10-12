@@ -7,20 +7,22 @@ export function BrandLockup({
   mark,
   onDark = false,
   priority = false,
+  iconSize = 28,
 }: {
   href?: string | null;
   className?: string;
   mark?: string;
   onDark?: boolean;
   priority?: boolean;
+  iconSize?: 24 | 28;
 }) {
   const classes = `inline-flex items-center gap-2.5 font-serif leading-none tracking-[-0.3px] ${className}`;
   const body = (
     <>
       <span
-        className={`inline-flex size-[1cap] shrink-0 overflow-hidden rounded-[2px] ${
-          onDark ? "shadow-[0_0_0_1px_rgba(250,248,244,0.9)]" : ""
-        }`}
+        className={`inline-flex shrink-0 overflow-hidden rounded-[2px] ${
+          iconSize === 24 ? "size-6" : "size-7"
+        } ${onDark ? "shadow-[0_0_0_1px_rgba(250,248,244,0.9)]" : ""}`}
       >
         <Image
           src="/brand/fk-icon.svg"
