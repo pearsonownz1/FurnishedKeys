@@ -77,7 +77,7 @@ export function AppShell({
       </header>
       <div className="flex min-h-0 flex-1">
         <aside className="hidden w-[232px] shrink-0 flex-col border-r border-line bg-white px-3 py-5 md:flex">
-          <BrandLockup href="/" mark={mark} priority className="mb-5 px-3 text-[22px]" />
+          <BrandLockup href="/" mark={mark} priority className="mb-5 w-full flex-wrap px-3 text-[22px]" />
           <nav aria-label={navLabel} className="grid gap-0.5">
             {items.map((item) => (
               <NavLink key={item.href} item={item} pathname={pathname} />
