@@ -1,10 +1,20 @@
 "use client";
 
 import { submitOwnerLead } from "@/app/(site)/owners/actions";
+import { assessmentCalendlyUrl } from "@/lib/calendly";
 import type { OwnerLeadActionState, OwnerLeadField } from "@/lib/leads";
 import { readOwnerLeadForm, validateOwnerLead } from "@/lib/leads";
 import { furnishedLevels, propertyTypes } from "@/lib/db/types";
-import { useActionState, type ReactNode } from "react";
+import Script from "next/script";
+import { useActionState, useCallback, useEffect, useRef, type ReactNode } from "react";
+
+declare global {
+  interface Window {
+    Calendly?: {
+      initInlineWidget: (options: { url: string; parentElement: HTMLElement }) => void;
+    };
+  }
+}
 
 const empty: OwnerLeadActionState = { ok: false };
 
@@ -46,18 +56,32 @@ export function AssessmentForm({ source }: { source: string }) {
     const input = readOwnerLeadForm(formData);
     const local = validateOwnerLead(input);
     if (!local.ok) return { ok: false, fieldErrors: local.fieldErrors };
-    return submitOwnerLead(previous, formData);
+    const result = await submitOwnerLead(previous, formData);
+    if (!result.success) return result;
+    return { ...result, name: input.name, email: input.email };
   }
 
   const [state, formAction, pending] = useActionState(action, empty);
 
   if (state.success) {
+    const url = assessmentCalendlyUrl({
+      name: state.name,
+      email: state.email,
+      campaign: source,
+    });
     return (
-      <div className="w-full bg-surface p-6 shadow-search md:p-10 lg:my-12 lg:mr-[120px]" role="status">
+      <div
+        className="w-full min-w-0 bg-surface px-3 py-6 shadow-search sm:p-6 md:p-10 lg:my-12 lg:mr-[max(1.25rem,calc((100vw-1200px)/2))]"
+        role="status"
+      >
         <p className="font-serif text-3xl leading-none">Request received</p>
         <p className="mt-3 max-w-md text-sm leading-relaxed text-muted">
           We&apos;ll follow up by email about what it could rent for and how we&apos;d work together.
         </p>
+        <h3 className="mt-8 font-serif text-[1.75rem] leading-none font-normal">
+          Want to talk sooner? Pick a time
+        </h3>
+        <CalendlyInline url={url} />
       </div>
     );
   }
@@ -204,6 +228,46 @@ export function AssessmentForm({ source }: { source: string }) {
         </button>
       </div>
     </form>
+  );
+}
+
+function CalendlyInline({ url }: { url: string }) {
+  const parentRef = useRef<HTMLDivElement>(null);
+  const initialized = useRef(false);
+
+  const mount = useCallback(() => {
+    const parent = parentRef.current;
+    if (!parent || initialized.current) return;
+    if (parent.querySelector("iframe")) {
+      initialized.current = true;
+      return;
+    }
+    const calendly = window.Calendly;
+    if (!calendly?.initInlineWidget) return;
+    initialized.current = true;
+    calendly.initInlineWidget({ url, parentElement: parent });
+  }, [url]);
+
+  useEffect(() => {
+    mount();
+  }, [mount]);
+
+  return (
+    <>
+      <div
+        ref={parentRef}
+        className="calendly-inline-widget mt-5 w-full"
+        data-url={url}
+        style={{ minWidth: 320, height: 700 }}
+      />
+      <Script
+        id="calendly-widget"
+        src="https://assets.calendly.com/assets/external/widget.js"
+        strategy="afterInteractive"
+        onLoad={mount}
+        onReady={mount}
+      />
+    </>
   );
 }
 
