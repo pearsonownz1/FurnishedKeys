@@ -32,6 +32,8 @@ export type OwnerLeadActionState = {
   success?: boolean;
   fieldErrors?: Partial<Record<OwnerLeadField, string>>;
   formError?: string;
+  name?: string;
+  email?: string;
 };
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
