@@ -727,7 +727,7 @@ describe("deliverOwnerLeadNotice", () => {
     expect(ownerLeadNoticeHtml(lead)).toContain("full_management");
   });
 
-  it("falls back to Guy's address when LEADS_NOTIFY_TO is unset", async () => {
+  it("falls back to hello@furnishedkeys.com when LEADS_NOTIFY_TO is unset", async () => {
     vi.stubEnv("RESEND_API_KEY", "re_test_key");
     vi.stubEnv("EMAIL_FROM", "Furnished Keys <hello@furnishedkeys.com>");
     vi.stubEnv("LEADS_NOTIFY_TO", "");

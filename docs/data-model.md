@@ -170,7 +170,7 @@ Management consultation form.
 
 Anyone can insert a new, unassigned lead, including `interest` and `source`. The insert policy only requires `status = new` and `assigned_to` null, and the insert grant is table-level, so both columns are writable. Visitors cannot read the row back. `manager` and `admin` profiles can read the inbox. Updates are admin only. `assigned_to` must be a manager or admin.
 
-After a successful insert, `submitOwnerLead` emails `LEADS_NOTIFY_TO` or, when that is unset, `guy@gcs.org`. The subject is `New owner lead: <interest> – <property address>`. Every field in the HTML is escaped. Reply-To is the lead's email. A mail failure is logged. The action still returns `{ ok: true, success: true }`.
+After a successful insert, `submitOwnerLead` emails `LEADS_NOTIFY_TO` or, when that is unset, `hello@furnishedkeys.com`. The subject is `New owner lead: <interest> – <property address>`. Every field in the HTML is escaped. Reply-To is the lead's email. A mail failure is logged. The action still returns `{ ok: true, success: true }`.
 
 ## Address privacy
 
