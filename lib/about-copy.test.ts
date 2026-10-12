@@ -30,7 +30,7 @@ describe("founder", () => {
         "@type": "Organization",
         name: brand.name,
       },
-      image: "https://www.furnishedkeys.com/about/lindsey-pearson-bw.webp",
+      image: "https://www.furnishedkeys.com/about/lindsey-pearson-bw-portrait.webp",
       areaServed: ["Portland", "Central Oregon"],
     });
   });

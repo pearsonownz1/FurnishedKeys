@@ -4,7 +4,7 @@ import { SITE_ORIGIN } from "@/lib/site";
 export const founder = {
   name: "Lindsey Pearson",
   role: "Founder · Licensed Real Estate Broker",
-  imageSrc: "/about/lindsey-pearson-bw.webp",
+  imageSrc: "/about/lindsey-pearson-bw-portrait.webp",
   imageAlt: `Lindsey Pearson, founder of ${brand.name}`,
   bio: `Lindsey has spent more than 20 years in real estate and property management, serving owners and renters across Portland and Central Oregon. ${brand.name} connects the people who need a furnished place for a few months, like traveling professionals, relocating families and contract workers, with local owners who have ADUs and spare homes.`,
   answerLead: `${brand.name} is her answer. Owners list for free and decide who stays and when, and renters deal directly with the person who owns the place. For owners who'd rather hand it off, `,
