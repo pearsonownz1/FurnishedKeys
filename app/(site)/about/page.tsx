@@ -1,5 +1,7 @@
+import Image from "next/image";
 import Link from "next/link";
-import { aboutPage } from "@/lib/about-copy";
+import { JsonLd } from "@/components/content/json-ld";
+import { aboutPage, founder, founderJsonLd } from "@/lib/about-copy";
 import { canonical } from "@/lib/site";
 
 export const metadata = {
@@ -15,6 +17,39 @@ export default function AboutPage() {
 
   return (
     <div>
+      <JsonLd data={founderJsonLd()} />
+      <section className="border-b border-line">
+        <div className="shell grid items-center gap-8 py-16 md:grid-cols-[420px_minmax(0,1fr)] md:py-20 lg:gap-12">
+          <div className="relative aspect-[4/5] overflow-hidden rounded-[2px] bg-stone">
+            <Image
+              src={founder.imageSrc}
+              alt={founder.imageAlt}
+              fill
+              priority
+              sizes="(min-width: 768px) 420px, calc(100vw - 2.5rem)"
+              className="object-cover object-[18%_center]"
+            />
+          </div>
+          <div className="max-w-[40rem]">
+            <p className="text-sm text-pine">{founder.role}</p>
+            <h2 className="mt-3 font-serif text-[clamp(2.25rem,4vw,3.25rem)] leading-[1.05] font-normal tracking-[-0.6px]">
+              {founder.name}
+            </h2>
+            <div className="mt-5 space-y-4 text-[17px] leading-relaxed">
+              <p>{founder.bio}</p>
+              <p>
+                {founder.answerLead}
+                <Link href={founder.managementHref} className="font-semibold text-pine">
+                  {founder.managementLink}
+                </Link>
+                .
+              </p>
+            </div>
+            <p className="mt-5 text-sm italic text-muted">{founder.license}</p>
+          </div>
+        </div>
+      </section>
+
       <section className="shell py-16 lg:py-24">
         <p className="text-xs tracking-[0.14em] text-muted uppercase">About</p>
         <h1 className="mt-4 max-w-[14ch] font-serif text-[clamp(2.75rem,6vw,4.5rem)] leading-[0.98] font-normal tracking-[-1px]">

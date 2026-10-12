@@ -1,3 +1,33 @@
+import { brand } from "@/lib/brand";
+import { SITE_ORIGIN } from "@/lib/site";
+
+export const founder = {
+  name: "Lindsey Pearson",
+  role: "Founder · Licensed Real Estate Broker",
+  imageSrc: "/about/lindsey-pearson-bw.webp",
+  imageAlt: `Lindsey Pearson, founder of ${brand.name}`,
+  bio: `Lindsey has spent more than 20 years in real estate and property management, serving owners and renters across Portland and Central Oregon. ${brand.name} connects the people who need a furnished place for a few months, like traveling professionals, relocating families and contract workers, with local owners who have ADUs and spare homes.`,
+  answerLead: `${brand.name} is her answer. Owners list for free and decide who stays and when, and renters deal directly with the person who owns the place. For owners who'd rather hand it off, `,
+  managementLink: "ask us about full management",
+  managementHref: "/management",
+  license: "Licensed in Oregon with eXp Realty, #201238658.",
+} as const;
+
+export function founderJsonLd() {
+  return {
+    "@context": "https://schema.org",
+    "@type": "Person",
+    name: founder.name,
+    jobTitle: "Founder",
+    worksFor: {
+      "@type": "Organization",
+      name: brand.name,
+    },
+    image: new URL(founder.imageSrc, SITE_ORIGIN).toString(),
+    areaServed: ["Portland", "Central Oregon"],
+  };
+}
+
 export const aboutPage = {
   title: "About Furnished Keys | Furnished homes. Flexible stays.",
   description:
