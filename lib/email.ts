@@ -46,8 +46,8 @@ export type InquiryDecline = {
   note: string | null;
 };
 
-/** Guy's address. Preview tests override this with LEADS_NOTIFY_TO. */
-export const DEFAULT_LEADS_NOTIFY_TO = "guy@gcs.org";
+/** Staff inbox for owner-lead alerts. LEADS_NOTIFY_TO overrides it (preview sink). */
+export const DEFAULT_LEADS_NOTIFY_TO = "hello@furnishedkeys.com";
 
 export type OwnerLeadNotice = {
   name: string;
