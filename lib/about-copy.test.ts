@@ -11,7 +11,8 @@ describe("founder", () => {
       `${brand.name} connects the people who need a furnished place for a few months, like traveling professionals, relocating families and contract workers, with local owners who have ADUs and spare homes.`,
     );
     expect(founder.bio).not.toContain("started");
-    expect(founder.answerLead.startsWith(`${brand.name} is her answer.`)).toBe(true);
+    expect(founder.answerLead.startsWith("Owners list for free and decide who stays and when")).toBe(true);
+    expect(founder.answerLead).not.toContain("is her answer");
     expect(founder.answerLead.endsWith("For owners who'd rather hand it off, ")).toBe(true);
     expect(founder.answerLead).not.toContain("Lindsey and her team");
     expect(founder.managementLink).toBe("ask us about full management");
@@ -30,7 +31,7 @@ describe("founder", () => {
         "@type": "Organization",
         name: brand.name,
       },
-      image: "https://www.furnishedkeys.com/about/lindsey-pearson-bw.webp",
+      image: "https://www.furnishedkeys.com/about/lindsey-pearson-bw-portrait.webp",
       areaServed: ["Portland", "Central Oregon"],
     });
   });

@@ -73,11 +73,8 @@ export function AssessmentForm({ source }: { source: string }) {
       <div className="min-w-0 lg:my-12 lg:pr-[max(1.25rem,calc((100vw-1200px)/2))]">
         <div className="bg-surface px-3 py-6 shadow-search sm:p-6 md:p-10" role="status">
           <p className="font-serif text-3xl leading-none">Request received</p>
-          <p className="mt-3 max-w-md text-sm leading-relaxed text-muted">
-            We&apos;ll follow up by email about what it could rent for and how we&apos;d work together.
-          </p>
-          <h3 className="mt-8 font-serif text-[1.75rem] leading-none font-normal">
-            Want to talk sooner? Pick a time
+          <h3 className="mt-3 font-serif text-[1.75rem] leading-snug font-normal">
+            We&apos;ll follow up by email. Want to talk sooner? Pick a 30-minute call with Lindsey.
           </h3>
           <CalendlyInline url={url} />
         </div>
